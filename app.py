@@ -14,6 +14,14 @@ from langdetect import detect
 from datetime import datetime
 import time
 
+# THIS MUST BE FIRST STREAMLIT COMMAND!
+st.set_page_config(
+    page_title="JobShield AI - Premium Security",
+    page_icon="🛡️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 # ─────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────
@@ -39,10 +47,6 @@ elif os.path.exists(r"C:\Users\Lenovo\Desktop\AI fake job\fake_job.csv"):
 else:
     DATASET_PATH = "fake_job.csv"  # default
     print("❌ Dataset not found! Please check location")
-
-
-st.set_page_config(page_title="JobShield AI - Premium Security", page_icon="🛡️", layout="wide", initial_sidebar_state="expanded")
-
 # ─────────────────────────────────────────────
 # PREMIUM CSS WITH ANIMATIONS
 # ─────────────────────────────────────────────
@@ -1160,6 +1164,7 @@ st.markdown("""
     🛡️ JobShield AI v2.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
+
 
 
 

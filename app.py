@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit as s
 import pandas as pd
 import os
 import json
@@ -16,8 +16,6 @@ import time
 
 # ─────────────────────────────────────────────
 # CONFIGURATION
-# ─────────────────────────────────────────────
- CONFIGURATION - WORKS ON BOTH LAPTOP & PHONE
 # ─────────────────────────────────────────────
 SENDER_EMAIL = "project192003@gmail.com"
 SENDER_PASSWORD = "zppgvmmtergdvzgs"
@@ -1167,4 +1165,5 @@ st.markdown("""
     🛡️ JobShield AI v2.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
+
 

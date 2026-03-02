@@ -17,11 +17,30 @@ import time
 # ─────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────
+ CONFIGURATION - WORKS ON BOTH LAPTOP & PHONE
+# ─────────────────────────────────────────────
 SENDER_EMAIL = "project192003@gmail.com"
 SENDER_PASSWORD = "zppgvmmtergdvzgs"
-ADMIN_EMAIL = "project192003@gmail.com"  # Admin email for alerts
+ADMIN_EMAIL = "project192003@gmail.com"
 USERS_FILE = "users.json"
-DATASET_PATH = r"C:\\Users\\Lenovo\\Desktop\\AI fake job\\fake_job.csv"
+
+# SMART PATH - WORKS ON LAPTOP & PHONE
+import os
+
+# Method 1: First try same folder (for phone & cloud)
+if os.path.exists("fake_job.csv"):
+    DATASET_PATH = "fake_job.csv"
+    print("✅ Using local file: fake_job.csv")
+    
+# Method 2: If not found, try laptop specific path
+elif os.path.exists(r"C:\Users\Lenovo\Desktop\AI fake job\fake_job.csv"):
+    DATASET_PATH = r"C:\Users\Lenovo\Desktop\AI fake job\fake_job.csv"
+    print("✅ Using laptop path: C:\\Users\\Lenovo\\Desktop\\AI fake job\\fake_job.csv")
+    
+# Method 3: If both not found, show error
+else:
+    DATASET_PATH = "fake_job.csv"  # default
+    print("❌ Dataset not found! Please check location")
 
 st.set_page_config(
     page_title="JobShield AI - Premium Security",
@@ -29,6 +48,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
 
 # ─────────────────────────────────────────────
 # PREMIUM CSS WITH ANIMATIONS
@@ -1147,3 +1167,4 @@ st.markdown("""
     🛡️ JobShield AI v2.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
+

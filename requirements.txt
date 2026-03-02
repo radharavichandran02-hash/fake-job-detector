@@ -1,0 +1,7 @@
+streamlit
+pandas
+scikit-learn
+deep-translator
+langdetect
+openpyxl
+xlrd

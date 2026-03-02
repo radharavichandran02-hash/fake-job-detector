@@ -1,4 +1,4 @@
-import streamlit as s
+import streamlit as st
 import pandas as pd
 import os
 import json
@@ -13,18 +13,9 @@ from sklearn.linear_model import LogisticRegression
 from langdetect import detect
 from datetime import datetime
 import time
+  
+# CONFIGURATION - WORKS ON BOTH LAPTOP & PHONE
 
-# THIS MUST BE FIRST STREAMLIT COMMAND!
-st.set_page_config(
-    page_title="JobShield AI - Premium Security",
-    page_icon="🛡️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# ─────────────────────────────────────────────
-# CONFIGURATION
-# ─────────────────────────────────────────────
 SENDER_EMAIL = "project192003@gmail.com"
 SENDER_PASSWORD = "zppgvmmtergdvzgs"
 ADMIN_EMAIL = "project192003@gmail.com"
@@ -47,7 +38,14 @@ elif os.path.exists(r"C:\Users\Lenovo\Desktop\AI fake job\fake_job.csv"):
 else:
     DATASET_PATH = "fake_job.csv"  # default
     print("❌ Dataset not found! Please check location")
-# ─────────────────────────────────────────────
+
+st.set_page_config(
+    page_title="JobShield AI - Premium Security",
+    page_icon="🛡️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+# ──────────────────────────────────
 # PREMIUM CSS WITH ANIMATIONS
 # ─────────────────────────────────────────────
 st.markdown("""
@@ -1164,7 +1162,5 @@ st.markdown("""
     🛡️ JobShield AI v2.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
-
-
 
 

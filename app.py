@@ -1148,7 +1148,13 @@ def show_main_page():
         """, unsafe_allow_html=True)
         
         st.markdown('<div class="glass-card-premium">', unsafe_allow_html=True)
-        
+        #image upload hide in phone
+        if OCR_AVALIABLE:
+            options =["📝 Paste Text","🔗 Job URL", "📸 Image Upload"]
+        else:
+            options =["📝 Paste Text","🔗 Job URL"]
+            st.info("📸 Image Upload is only available on laptop, please use text or URL on phone.")
+            
         # Input method
         input_method = st.radio(
             "Choose input method:",
@@ -1375,3 +1381,4 @@ st.markdown("""
     🛡️ JobShield AI v3.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
+

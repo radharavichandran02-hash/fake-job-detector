@@ -1163,7 +1163,7 @@ else:
             
         # Input method
         
-        input_method = st.radio(
+input_method = st.radio(
             "Choose input method:",
             ["📝 Paste Text", "🔗 Job URL", "📸 Image Upload"],
             horizontal=True
@@ -1388,5 +1388,6 @@ st.markdown("""
     🛡️ JobShield AI v3.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
+
 
 

@@ -1154,8 +1154,15 @@ def show_main_page():
         else:
             options =["📝 Paste Text","🔗 Job URL"]
             st.info("📸 Image Upload is only available on laptop, please use text or URL on phone.")
+            # Show image upload only if OCR available (laptop)
+if OCR_AVAILABLE:  # <--- FIX: AVAILABLE (not AVALIABLE)
+    options = ["📝 Paste Text", "🔗 Job URL", "📸 Image Upload"]
+else:
+    options = ["📝 Paste Text", "🔗 Job URL"]
+    st.info("📸 Image upload works only on laptop. Please use Text or URL on phone.")
             
         # Input method
+        
         input_method = st.radio(
             "Choose input method:",
             ["📝 Paste Text", "🔗 Job URL", "📸 Image Upload"],
@@ -1381,4 +1388,5 @@ st.markdown("""
     🛡️ JobShield AI v3.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
+
 

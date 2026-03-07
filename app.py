@@ -1269,9 +1269,9 @@ def show_main_page():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             analyze_clicked = st.button("🔍 ANALYZE JOB - DETECT FRAUD", use_container_width=True)
-        
-        if analyze_clicked:
-    if not job_text.strip():
+            
+if analyze_clicked:
+      if not job_text.strip():
         st.warning("⚠️ Please enter job content first!")
     elif model is None:
         st.error("❌ AI Model not loaded - check dataset path!")
@@ -1418,5 +1418,6 @@ st.markdown("""
     🛡️ JobShield AI v3.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
+
 
 

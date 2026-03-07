@@ -5,3 +5,6 @@ deep-translator
 langdetect
 openpyxl
 xlrd
+pillow
+pytesseract
+matplotlib

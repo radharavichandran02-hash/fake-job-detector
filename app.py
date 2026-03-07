@@ -900,7 +900,8 @@ def analyze_job(job_text):
             'detected_lang': detected_lang,
             'translated_text': translated
         }
-    except Exception:
+    except Exception as e:
+        print(f"Analysis error: {e}")
         return None
 
 # ==================== TRUSTED SITES (unchanged) ====================
@@ -1270,46 +1271,41 @@ def show_main_page():
             analyze_clicked = st.button("🔍 ANALYZE JOB - DETECT FRAUD", use_container_width=True)
         
         if analyze_clicked:
-            if not job_text.strip():
-                st.warning("⚠️ Please enter job content first!")
-            elif model is None:
-                st.error("❌ AI Model not loaded - check dataset path!")
+    if not job_text.strip():
+        st.warning("⚠️ Please enter job content first!")
+    elif model is None:
+        st.error("❌ AI Model not loaded - check dataset path!")
+    else:
+        with st.spinner("🔍 Analyzing with AI Engine..."):
+            analysis = analyze_job(job_text)
+        
+        # ⭐ NEW SAFETY CHECK ⭐
+        if analysis and isinstance(analysis, dict):
+            st.markdown("---")
+            
+            if analysis.get('result') == "FAKE":
+                st.markdown(f"""
+                <div class="fake-banner-premium">
+                    <h2>🚩 WARNING: FAKE JOB DETECTED!</h2>
+                    <p style="font-size:1.5rem;"><strong>Fraud Probability: {analysis.get('score', 0):.1f}%</strong></p>
+                    <p style="font-size:1.1rem;">⛔ Do NOT apply or pay any money for this job!</p>
+                </div>
+                """, unsafe_allow_html=True)
             else:
-                with st.spinner("🔍 Analyzing with AI Engine..."):
-                    analysis = analyze_job(job_text)
-                
-                if not analysis:
-                    st.error("❌ Analysis failed. Please try again.")
-                else:
-                    # Save to history (NEW)
-                    history_entry = {
-                        'timestamp': datetime.now().isoformat(),
-                        'job_text': job_text[:100],
-                        'result': analysis['result'],
-                        'score': analysis['score'],
-                        'language': analysis['detected_lang']
-                    }
-                    st.session_state.history.append(history_entry)
-                    
-                    st.markdown("---")
-                    
-                    if analysis['result'] == "FAKE":
-                        st.markdown(f"""
-                        <div class="fake-banner-premium">
-                            <h2>🚩 WARNING: FAKE JOB DETECTED!</h2>
-                            <p style="font-size:1.5rem;"><strong>Fraud Probability: {analysis['score']:.1f}%</strong></p>
-                            <p style="font-size:1.1rem;">⛔ Do NOT apply or pay any money for this job!</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                        <div class="genuine-banner-premium">
-                            <h2>✅ LIKELY GENUINE JOB</h2>
-                            <p style="font-size:1.5rem;"><strong>Safety Score: {100 - analysis['score']:.1f}%</strong></p>
-                            <p style="font-size:1.1rem;">Still verify company details before applying.</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
+                st.markdown(f"""
+                <div class="genuine-banner-premium">
+                    <h2>✅ LIKELY GENUINE JOB</h2>
+                    <p style="font-size:1.5rem;"><strong>Safety Score: {100 - analysis.get('score', 0):.1f}%</strong></p>
+                    <p style="font-size:1.1rem;">Still verify company details before applying.</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # code (share buttons, language analysis, history, etc.)
+            # ...
+            
+        else:
+            st.error("❌ Analysis failed. Invalid result.")
+
                     # ===== NEW: Share buttons =====
                     st.markdown("### 📤 Share Result")
                     if analysis['result'] == "FAKE":
@@ -1422,4 +1418,5 @@ st.markdown("""
     🛡️ JobShield AI v3.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
+
 

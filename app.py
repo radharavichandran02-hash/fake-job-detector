@@ -1148,28 +1148,37 @@ def show_main_page():
         """, unsafe_allow_html=True)
         
         st.markdown('<div class="glass-card-premium">', unsafe_allow_html=True)
-        #image upload hide in phone
-        if OCR_AVALIABLE:
-            options =["📝 Paste Text","🔗 Job URL", "📸 Image Upload"]
-        else:
-            options =["📝 Paste Text","🔗 Job URL"]
-            st.info("📸 Image Upload is only available on laptop, please use text or URL on phone.")
-            # Show image upload only if OCR available (laptop)
-if OCR_AVAILABLE:  # <--- FIX: AVAILABLE (not AVALIABLE)
-    options = ["📝 Paste Text", "🔗 Job URL", "📸 Image Upload"]
-else:
-    options = ["📝 Paste Text", "🔗 Job URL"]
-    st.info("📸 Image upload works only on laptop. Please use Text or URL on phone.")
-            
-        # Input method
         
-input_method = st.radio(
+        # Input metho
+        
+                # Show image upload only if OCR available (laptop)
+        if OCR_AVAILABLE:
+            options = ["📝 Paste Text", "🔗 Job URL", "📸 Image Upload"]
+        else:
+            options = ["📝 Paste Text", "🔗 Job URL"]
+            st.info("📸 Image upload works only on laptop. Please use Text or URL on phone.")
+        
+        input_method = st.radio(
             "Choose input method:",
-            ["📝 Paste Text", "🔗 Job URL", "📸 Image Upload"],
+            options,
             horizontal=True
         )
         
-        job_text = ""
+        job_text = ""  # <--- 4 spaces munnadi (indentation correct)
+        
+        if input_method == "📝 Paste Text":
+            st.markdown("#### 📝 Paste Job Description")
+            job_text = st.text_area(
+                "Paste the job posting here:",
+                height=200,
+                placeholder="Copy and paste the suspicious job description here..."
+            )
+        elif input_method == "🔗 Job URL":
+            st.markdown("#### 🔗 Enter Job URL")
+            url = st.text_input("Paste the job URL:", placeholder="https://...")
+            if url:
+                domain = url.split('/')[2] if '//' in url else url
+                # ... rest of URL code ...
         
         if input_method == "📝 Paste Text":
             st.markdown("#### 📝 Paste Job Description")
@@ -1388,6 +1397,7 @@ st.markdown("""
     🛡️ JobShield AI v3.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
+
 
 
 

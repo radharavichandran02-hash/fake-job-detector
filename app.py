@@ -55,6 +55,7 @@ st.set_page_config(
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
+    
 )
 
 # ==================== NEW: SESSION STATE FOR HISTORY ====================
@@ -404,6 +405,8 @@ st.markdown("""
         padding-top: 0 !important;
         margin-top: 0 !important;
     }
+
+    
     
     hr {
         border: none;
@@ -558,7 +561,7 @@ def clean_ocr_text(text):
     lines = [line.strip() for line in cleaned.split('\n') if line.strip()]
     return '\n'.join(lines)
 
-# ==================== ADMIN ALERT FUNCTION ====================
+# ==================== ADMIN ALERT FUNCTION (unchanged) ====================
 def send_admin_alert(user_email, user_name, action="login"):
     try:
         msg = MIMEMultipart('alternative')
@@ -612,7 +615,7 @@ def send_admin_alert(user_email, user_name, action="login"):
         print(f"Admin alert failed: {e}")
         return False
 
-# ==================== USER MANAGEMENT ====================
+# ==================== USER MANAGEMENT (unchanged) ====================
 def load_users():
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, 'r') as f:
@@ -642,7 +645,7 @@ def login_user(email, password):
         return False, "Wrong password!"
     return True, users[email]['name']
 
-# ==================== ENHANCED EMAIL FUNCTION ====================
+# ==================== ENHANCED EMAIL FUNCTION (unchanged) ====================
 def send_email_alert(to_email, user_name, job_text, result, score, suggestions,
                      trigger_hits, detected_lang="en", translated_text=""):
     try:
@@ -743,7 +746,7 @@ def send_email_alert(to_email, user_name, job_text, result, score, suggestions,
     except Exception:
         return False
 
-# ==================== MODEL TRAINING ====================
+# ==================== MODEL TRAINING (unchanged) ====================
 @st.cache_resource
 def train_model():
     try:
@@ -796,7 +799,7 @@ def train_model():
 
 model, vectorizer = train_model()
 
-# ==================== TRANSLATION FUNCTION ====================
+# ==================== TRANSLATION FUNCTION (unchanged) ====================
 def translate_to_english(text):
     try:
         detected_lang = detect(text)
@@ -815,7 +818,7 @@ def translate_to_english(text):
             pass
     return text, detected_lang
 
-# ==================== JOB ANALYSIS FUNCTION ====================
+# ==================== JOB ANALYSIS FUNCTION (unchanged) ====================
 def analyze_job(job_text):
     if not job_text or model is None:
         return None
@@ -897,11 +900,10 @@ def analyze_job(job_text):
             'detected_lang': detected_lang,
             'translated_text': translated
         }
-    except Exception as e:
-        print(f"Analysis error: {e}")
+    except Exception:
         return None
 
-# ==================== TRUSTED SITES ====================
+# ==================== TRUSTED SITES (unchanged) ====================
 def get_trusted_sites():
     return [
         {'name': 'LinkedIn',  'url': 'https://www.linkedin.com/jobs', 'logo': 'https://www.google.com/s2/favicons?domain=linkedin.com&sz=64'},
@@ -913,52 +915,17 @@ def get_trusted_sites():
     ]
 
 # ==================== NEW: OCR FUNCTION ====================
-import requests
-
 def extract_text_from_image(uploaded_file):
-    """Extract text from image using OCR.space API"""
+    if not OCR_AVAILABLE:
+        return None, "Tesseract OCR not installed. Please install from https://github.com/UB-Mannheim/tesseract/wiki"
     try:
-        # OCR.space API endpoint
-        url = "https://api.ocr.space/parse/image"
-        
-        # API key - CHANGE THIS!
-        api_key = "YOUR_API_KEY_HERE"
-        
-        # File ah read pannu
-        image_bytes = uploaded_file.read()
-        
-        # Multipart form data
-        files = {
-            'file': (uploaded_file.name, image_bytes, uploaded_file.type)
-        }
-        data = {
-            'apikey': api_key,
-            'language': 'eng',
-            'isOverlayRequired': False,
-            'detectOrientation': True,
-            'scale': True
-        }
-        
-        # API call
-        response = requests.post(url, files=files, data=data)
-        result = response.json()
-        
-        # Check success
-        if not result.get('IsErroredOnProcessing'):
-            parsed_results = result.get('ParsedResults', [])
-            if parsed_results:
-                text = parsed_results[0].get('ParsedText', '')
-                return text, None
-            else:
-                return None, "No text found in image"
-        else:
-            error_msg = result.get('ErrorMessage', ['Unknown error'])[0]
-            return None, error_msg
-            
+        image = Image.open(uploaded_file)
+        text = pytesseract.image_to_string(image)
+        return text, None
     except Exception as e:
         return None, str(e)
 
-# ==================== PAGE FUNCTIONS ====================
+# ==================== NEW: PAGE FUNCTIONS ====================
 def show_history_page():
     st.markdown("## 📜 Scan History")
     if not st.session_state.history:
@@ -996,7 +963,7 @@ def show_analytics_page():
     else:
         st.write("Install matplotlib to see charts.")
 
-# ==================== AUTH PAGE ====================
+# ==================== AUTH PAGE (Updated - Single Box with Login & Register) ====================
 def show_auth_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     
@@ -1007,6 +974,9 @@ def show_auth_page():
             <p class="hero-sub-premium">Premium Fake Job Detection System</p>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Single Glass Card with both Login and Register
+        
         
         # Tabs inside the same box
         tab1, tab2 = st.tabs(["🔐 LOGIN", "📝 REGISTER"])
@@ -1028,6 +998,7 @@ def show_auth_page():
                             send_admin_alert(email, result, "login")
                         
                         st.success(f"✅ Welcome back, {result}!")
+                        
                         time.sleep(1)
                         st.rerun()
                     else:
@@ -1050,6 +1021,7 @@ def show_auth_page():
                         success, msg = register_user(name, email, password)
                         if success:
                             st.success(f"✅ {msg} Please login!")
+                            
                         else:
                             st.error(f"❌ {msg}")
                 else:
@@ -1081,7 +1053,7 @@ def show_auth_page():
             </div>
             """, unsafe_allow_html=True)
 
-# ==================== MAIN PAGE ====================
+# ==================== MAIN PAGE (modified to add navigation) ====================
 def show_main_page():
     # Admin Alert Badge
     st.markdown("""
@@ -1090,7 +1062,7 @@ def show_main_page():
     </div>
     """, unsafe_allow_html=True)
     
-    # Premium Sidebar
+    # Premium Sidebar (modified with navigation)
     with st.sidebar:
         st.markdown("""
         <div style="text-align:center; padding:1rem;">
@@ -1113,7 +1085,7 @@ def show_main_page():
         
         st.markdown("---")
         
-        # Quick Stats
+        # Quick Stats (unchanged)
         st.markdown("### 📊 Quick Stats")
         col1, col2 = st.columns(2)
         with col1:
@@ -1139,7 +1111,7 @@ def show_main_page():
     
     # Page routing
     if page == "🔍 Scanner":
-        # ===== Main Scanner UI =====
+        # ===== Main Scanner UI (mostly unchanged, but replace email with image upload) =====
         st.markdown("""
         <div class="hero-premium">
             <h1 class="hero-title-premium">🔍 Job Fraud Detector</h1>
@@ -1147,24 +1119,16 @@ def show_main_page():
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown('<div class="glass-card-premium">', unsafe_allow_html=True)
         
-        # Input metho
         
-                # Show image upload only if OCR available (laptop)
-        if OCR_AVAILABLE:
-            options = ["📝 Paste Text", "🔗 Job URL", "📸 Image Upload"]
-        else:
-            options = ["📝 Paste Text", "🔗 Job URL"]
-            st.info("📸 Image upload works only on laptop. Please use Text or URL on phone.")
-        
+        # REPLACED: Email Content → Image Upload
         input_method = st.radio(
             "Choose input method:",
-            options,
+            ["📝 Paste Text", "🔗 Job URL", "📸 Image Upload"],
             horizontal=True
         )
         
-        job_text = ""  # <--- 4 spaces munnadi (indentation correct)
+        job_text = ""
         
         if input_method == "📝 Paste Text":
             st.markdown("#### 📝 Paste Job Description")
@@ -1178,56 +1142,64 @@ def show_main_page():
             url = st.text_input("Paste the job URL:", placeholder="https://...")
             if url:
                 domain = url.split('/')[2] if '//' in url else url
-                # ... rest of URL code ...
-        
-        if input_method == "📝 Paste Text":
-            st.markdown("#### 📝 Paste Job Description")
-            job_text = st.text_area(
-                "Paste the job posting here:",
-                height=200,
-                placeholder="Copy and paste the suspicious job description here..."
-            )
-        elif input_method == "🔗 Job URL":
-            st.markdown("#### 🔗 Enter Job URL")
-            url = st.text_input("Paste the job URL:", placeholder="https://...")
-            if url:
-                domain = url.split('/')[2] if '//' in url else url
-                trusted = [
+                trusted = [ # Indian Job Portals
                     'naukri.com', 'shine.com', 'monsterindia.com', 'timesjobs.com', 'freshersworld.com',
                     'careers360.com', 'indeed.co.in', 'linkedin.com', 'glassdoor.co.in', 'foundit.in',
                     'apna.co', 'quikrjobs.com', 'click.in', 'hireclap.com', 'workindia.in',
                     'internshala.com', 'hellotasks.com', 'urbanpro.com', 'babajob.com', 'hirect.in',
+                    
+                    # Global Job Portals
                     'indeed.com', 'monster.com', 'careerbuilder.com', 'ziprecruiter.com', 'simplyhired.com',
                     'dice.com', 'upwork.com', 'freelancer.com', 'fiverr.com', 'toptal.com',
                     'angel.co', 'wellfound.com', 'hired.com', 'landing.jobs', 'remoteok.com',
                     'weworkremotely.com', 'flexjobs.com', 'virtualvocations.com', 'jobspresso.co',
+                    
+                    # Indian MNCs & Tech Companies
                     'tcs.com', 'infosys.com', 'wipro.com', 'hcl.com', 'techmahindra.com',
                     'lti.com', 'mindtree.com', 'cognizant.com', 'capgemini.com', 'accenture.com',
                     'ibm.com', 'microsoft.com', 'google.co.in', 'amazon.in', 'flipkart.com',
                     'paytm.com', 'phonepe.com', 'razorpay.com', 'zomato.com', 'swiggy.com',
                     'ola.com', 'uber.com', 'oyo.com', 'makemytrip.com', 'goibibo.com',
                     'byjus.com', 'unacademy.com', 'vedantu.com', 'upgrad.com', 'coursera.com',
+                    
+                    # Global Tech Companies
                     'apple.com', 'meta.com', 'facebook.com', 'twitter.com', 'netflix.com',
                     'adobe.com', 'salesforce.com', 'oracle.com', 'sap.com', 'vmware.com',
                     'cisco.com', 'intel.com', 'nvidia.com', 'amd.com', 'qualcomm.com',
                     'dell.com', 'hp.com', 'lenovo.com', 'sony.com', 'samsung.com',
                     'lg.com', 'panasonic.com', 'toshiba.com', 'hitachi.com', 'philips.com',
                     'siemens.com', 'ge.com', '3m.com', 'bosch.com', 'honeywell.com',
+                    
+                    # E-commerce & Retail
                     'walmart.com', 'target.com', 'bestbuy.com', 'homedepot.com', 'lowes.com',
                     'ebay.com', 'etsy.com', 'shopify.com', 'alibaba.com', 'aliexpress.com',
+                    
+                    # Banking & Finance
                     'icicibank.com', 'hdfcbank.com', 'sbicard.com', 'axisbank.com', 'kotak.com',
                     'goldmansachs.com', 'jpmorgan.com', 'morganstanley.com', 'credit-suisse.com',
                     'paypal.com', 'stripe.com', 'square.com', 'robinhood.com',
+                    
+                    # Telecom & Media
                     'airtel.com', 'jio.com', 'vodafone.com', 'idea.com', 'bsnl.co.in',
                     'disney.com', 'netflix.com', 'spotify.com', 'youtube.com', 'hotstar.com',
+                    
+                    # Government & Education
                     'gov.in', 'nic.in', 'upsc.gov.in', 'ssc.nic.in', 'ugc.ac.in',
                     'iit.ac.in', 'nit.edu', 'annauniv.edu', 'vtu.ac.in', 'jntuh.ac.in',
+                    
+                    # Healthcare
                     'apollohospitals.com', 'fortishealthcare.com', 'maxhealthcare.com', 'medanta.org',
                     'pfizer.com', 'novartis.com', 'roche.com', 'merck.com', 'johnsonandjohnson.com',
+                    
+                    # Automobile
                     'toyota.com', 'honda.com', 'hyundai.com', 'marutisuzuki.com', 'tata.com',
                     'mahindra.com', 'bmw.com', 'mercedes-benz.com', 'audi.com', 'ford.com',
+                    
+                    # Airlines & Travel
                     'airindia.com', 'indigo.in', 'spicejet.com', 'goair.in', 'emirates.com',
                     'qatarairways.com', 'singaporeair.com', 'britishairways.com', 'lufthansa.com',
+                    
+                    # Others
                     'zoom.us', 'slack.com', 'dropbox.com', 'box.com', 'github.com',
                     'gitlab.com', 'bitbucket.org', 'atlassian.com', 'jira.com', 'trello.com'
                 ]
@@ -1270,15 +1242,26 @@ def show_main_page():
                 with st.spinner("🔍 Analyzing with AI Engine..."):
                     analysis = analyze_job(job_text)
                 
-                # SAFETY CHECK
-                if analysis and isinstance(analysis, dict):
+                if not analysis:
+                    st.error("❌ Analysis failed. Please try again.")
+                else:
+                    # Save to history (NEW)
+                    history_entry = {
+                        'timestamp': datetime.now().isoformat(),
+                        'job_text': job_text[:100],
+                        'result': analysis['result'],
+                        'score': analysis['score'],
+                        'language': analysis['detected_lang']
+                    }
+                    st.session_state.history.append(history_entry)
+                    
                     st.markdown("---")
                     
-                    if analysis.get('result') == "FAKE":
+                    if analysis['result'] == "FAKE":
                         st.markdown(f"""
                         <div class="fake-banner-premium">
                             <h2>🚩 WARNING: FAKE JOB DETECTED!</h2>
-                            <p style="font-size:1.5rem;"><strong>Fraud Probability: {analysis.get('score', 0):.1f}%</strong></p>
+                            <p style="font-size:1.5rem;"><strong>Fraud Probability: {analysis['score']:.1f}%</strong></p>
                             <p style="font-size:1.1rem;">⛔ Do NOT apply or pay any money for this job!</p>
                         </div>
                         """, unsafe_allow_html=True)
@@ -1286,17 +1269,17 @@ def show_main_page():
                         st.markdown(f"""
                         <div class="genuine-banner-premium">
                             <h2>✅ LIKELY GENUINE JOB</h2>
-                            <p style="font-size:1.5rem;"><strong>Safety Score: {100 - analysis.get('score', 0):.1f}%</strong></p>
+                            <p style="font-size:1.5rem;"><strong>Safety Score: {100 - analysis['score']:.1f}%</strong></p>
                             <p style="font-size:1.1rem;">Still verify company details before applying.</p>
                         </div>
                         """, unsafe_allow_html=True)
                     
-                    # Share buttons
+                    # ===== NEW: Share buttons =====
                     st.markdown("### 📤 Share Result")
-                    if analysis.get('result') == "FAKE":
-                        share_text = f"🚨 FAKE JOB ALERT! Fraud Probability: {analysis.get('score', 0):.1f}%"
+                    if analysis['result'] == "FAKE":
+                        share_text = f"🚨 FAKE JOB ALERT! Fraud Probability: {analysis['score']:.1f}%"
                     else:
-                        share_text = f"✅ Job seems genuine! Safety Score: {100 - analysis.get('score', 0):.1f}%"
+                        share_text = f"✅ Job seems genuine! Safety Score: {100-analysis['score']:.1f}%"
                     
                     whatsapp_link = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
                     mailto_link = f"mailto:?subject=JobShield AI Result&body={urllib.parse.quote(share_text)}"
@@ -1309,18 +1292,18 @@ def show_main_page():
                     with col3:
                         st.markdown(f'<a href="{mailto_link}" class="share-button">📧 Email</a>', unsafe_allow_html=True)
                     
-                    # Auto Email
+                    # Auto Email (unchanged)
                     with st.spinner("📧 Sending analysis report to your email..."):
                         auto_sent = send_email_alert(
                             to_email=st.session_state.user_email,
                             user_name=st.session_state.user_name,
                             job_text=job_text,
-                            result=analysis.get('result'),
-                            score=analysis.get('score', 0),
-                            suggestions=analysis.get('suggestions', []),
-                            trigger_hits=analysis.get('trigger_hits', []),
-                            detected_lang=analysis.get('detected_lang', 'en'),
-                            translated_text=analysis.get('translated_text', ''),
+                            result=analysis['result'],
+                            score=analysis['score'],
+                            suggestions=analysis['suggestions'],
+                            trigger_hits=analysis['trigger_hits'],
+                            detected_lang=analysis['detected_lang'],
+                            translated_text=analysis['translated_text'],
                         )
                     
                     if auto_sent:
@@ -1337,34 +1320,43 @@ def show_main_page():
                     col1, col2 = st.columns(2)
                     
                     with col1:
+                        
                         st.markdown("#### 🌍 Language Analysis")
+                        
                         lang_map = {
                             'ta':'Tamil','hi':'Hindi','en':'English','ar':'Arabic','zh-cn':'Chinese',
                             'es':'Spanish','fr':'French','de':'German','ja':'Japanese','ko':'Korean',
                             'ru':'Russian','pt':'Portuguese','id':'Indonesian','tr':'Turkish',
                             'bn':'Bengali','vi':'Vietnamese','th':'Thai','ur':'Urdu',
                         }
-                        lang_display = lang_map.get(analysis.get('detected_lang'), analysis.get('detected_lang', 'unknown').upper())
+                        lang_display = lang_map.get(analysis['detected_lang'], analysis['detected_lang'].upper())
+                        
                         st.info(f"**Detected Language:** {lang_display}")
                         
-                        if analysis.get('detected_lang') != 'en':
+                        if analysis['detected_lang'] != 'en':
                             st.markdown("#### 📝 English Translation")
-                            st.info(analysis.get('translated_text', '')[:400])
+                            st.info(analysis['translated_text'][:400])
                         
-                        if analysis.get('trigger_hits'):
+                        if analysis['trigger_hits']:
                             st.markdown("#### ⚠️ Risk Indicators")
-                            for hit in analysis.get('trigger_hits', []):
+                            for hit in analysis['trigger_hits']:
                                 st.markdown(f'<span class="risk-badge-premium">{hit}</span>', unsafe_allow_html=True)
                         else:
                             st.success("✅ No major risk keywords found")
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
                     
                     with col2:
+                         
                         st.markdown("#### 💡 Recommendations")
-                        for s in analysis.get('suggestions', []):
+                        
+                        for s in analysis['suggestions']:
                             st.markdown(f"- {s}")
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
                     
                     st.markdown("<br>", unsafe_allow_html=True)
-                    heading = "### 🚨 Apply on These TRUSTED Platforms Instead!" if analysis.get('result') == "FAKE" else "### 🏆 Top Trusted Job Platforms"
+                    heading = "### 🚨 Apply on These TRUSTED Platforms Instead!" if analysis['result'] == "FAKE" else "### 🏆 Top Trusted Job Platforms"
                     st.markdown(heading)
                     cols = st.columns(6)
                     for i, site in enumerate(get_trusted_sites()):
@@ -1375,17 +1367,14 @@ def show_main_page():
                                 <br>
                                 <a href="{site['url']}" target="_blank">{site['name']}</a>
                             </div>""", unsafe_allow_html=True)
-                
-                else:
-                    st.error("❌ Analysis failed. Invalid result.")
-        
+                    
         # ===== End Scanner UI =====
     elif page == "📜 History":
         show_history_page()
     elif page == "📊 Analytics":
         show_analytics_page()
 
-# ==================== ROUTER ====================
+# ==================== ROUTER (unchanged) ====================
 if st.session_state.logged_in:
     show_main_page()
 else:
@@ -1397,7 +1386,3 @@ st.markdown("""
     🛡️ JobShield AI v3.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
-
-
-
-

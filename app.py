@@ -915,15 +915,51 @@ def get_trusted_sites():
     ]
 
 # ==================== NEW: OCR FUNCTION ====================
+import requests  # if not already at top
+
 def extract_text_from_image(uploaded_file):
-    if not OCR_AVAILABLE:
-        return None, "Tesseract OCR not installed. Please install from https://github.com/UB-Mannheim/tesseract/wiki"
+    """Extract text from image using OCR.space API"""
     try:
-        image = Image.open(uploaded_file)
-        text = pytesseract.image_to_string(image)
-        return text, None
+        # OCR.space API endpoint
+        url = "https://api.ocr.space/parse/image"
+        
+        # API key (neenga copy pannathu)
+        api_key = "YOUR_API_KEY_HERE"  # <--- CHANGE THIS!
+        
+        # File ah read pannu
+        image_bytes = uploaded_file.read()
+        
+        # Multipart form data
+        files = {
+            'file': (uploaded_file.name, image_bytes, uploaded_file.type)
+        }
+        data = {
+            'apikey': api_key,
+            'language': 'eng',
+            'isOverlayRequired': False,
+            'detectOrientation': True,
+            'scale': True
+        }
+        
+        # API call
+        response = requests.post(url, files=files, data=data)
+        result = response.json()
+        
+        # Check success
+        if not result.get('IsErroredOnProcessing'):
+            parsed_results = result.get('ParsedResults', [])
+            if parsed_results:
+                text = parsed_results[0].get('ParsedText', '')
+                return text, None
+            else:
+                return None, "No text found in image"
+        else:
+            error_msg = result.get('ErrorMessage', ['Unknown error'])[0]
+            return None, error_msg
+            
     except Exception as e:
         return None, str(e)
+
 
 # ==================== NEW: PAGE FUNCTIONS ====================
 def show_history_page():
@@ -1386,3 +1422,4 @@ st.markdown("""
     🛡️ JobShield AI v3.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
+

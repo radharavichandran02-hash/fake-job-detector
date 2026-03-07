@@ -5,38 +5,49 @@ import json
 import re
 import smtplib
 import hashlib
+import urllib.parse
+import io
+import base64
+from datetime import datetime
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from deep_translator import GoogleTranslator, MyMemoryTranslator
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from langdetect import detect
-from datetime import datetime
-import time
-  
-# CONFIGURATION - WORKS ON BOTH LAPTOP & PHONE
 
+# ==================== NEW: OCR SETUP ====================
+try:
+    import pytesseract
+    from PIL import Image
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    OCR_AVAILABLE = True
+except:
+    OCR_AVAILABLE = False
+
+# ==================== NEW: MATPLOTLIB FOR ANALYTICS ====================
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except:
+    MATPLOTLIB_AVAILABLE = False
+
+# ==================== CONFIGURATION (unchanged) ====================
 SENDER_EMAIL = "project192003@gmail.com"
 SENDER_PASSWORD = "zppgvmmtergdvzgs"
 ADMIN_EMAIL = "project192003@gmail.com"
 USERS_FILE = "users.json"
 
 # SMART PATH - WORKS ON LAPTOP & PHONE
-import os
-
-# Method 1: First try same folder (for phone & cloud)
 if os.path.exists("fake_job.csv"):
     DATASET_PATH = "fake_job.csv"
     print("✅ Using local file: fake_job.csv")
-    
-# Method 2: If not found, try laptop specific path
 elif os.path.exists(r"C:\Users\Lenovo\Desktop\AI fake job\fake_job.csv"):
     DATASET_PATH = r"C:\Users\Lenovo\Desktop\AI fake job\fake_job.csv"
-    print("✅ Using laptop path: C:\\Users\\Lenovo\\Desktop\\AI fake job\\fake_job.csv")
-    
-# Method 3: If both not found, show error
+    print("✅ Using laptop path")
 else:
-    DATASET_PATH = "fake_job.csv"  # default
+    DATASET_PATH = "fake_job.csv"
     print("❌ Dataset not found! Please check location")
 
 st.set_page_config(
@@ -44,10 +55,18 @@ st.set_page_config(
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
+    
 )
-# ──────────────────────────────────
-# PREMIUM CSS WITH ANIMATIONS
-# ─────────────────────────────────────────────
+
+# ==================== NEW: SESSION STATE FOR HISTORY ====================
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'history' not in st.session_state:
+    st.session_state.history = []  # for scan history
+if 'sound_enabled' not in st.session_state:
+    st.session_state.sound_enabled = True
+
+# ==================== PREMIUM CSS (Light Purple Background) ====================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -55,9 +74,9 @@ st.markdown("""
     
     * { font-family: 'Inter', sans-serif !important; }
     
-    /* Animated Gradient Background */
+    /* Light Purple Background */
     .stApp {
-        background: linear-gradient(145deg,#f8faff,#f0f3fd);
+        background: linear-gradient(145deg, #f3e8ff, #e9d9ff, #f3e8ff);
         background-size: 400% 400%;
         animation: gradient 15s ease infinite;
         min-height: 100vh;
@@ -69,15 +88,13 @@ st.markdown("""
         100% { background-position: 0% 50%; }
     }
     
-    /* Premium Text Colors */
     p, span, label, div, h1, h2, h3, h4, h5, li {
-        color: #1e293b !important;
+        color: #1e1e3f !important;
     }
     .hero-sub {
-    color: #475569 !important;
+        color: #4a4a6a !important;
     }
     
-    /* Animated Hero Section */
     .hero-premium {
         text-align: center;
         padding: 2rem 0;
@@ -87,7 +104,7 @@ st.markdown("""
     .hero-title-premium {
         font-size: 4rem;
         font-weight: 800;
-        background: linear-gradient(90deg, #2563eb, #7c3aed, #db2777);
+        background: linear-gradient(90deg, #6b21a5, #9333ea, #c084fc);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
@@ -103,31 +120,30 @@ st.markdown("""
     }
     
     .hero-sub-premium {
-        color: #94a3b8 !important;
+        color: #6b21a5 !important;
         font-size: 1.2rem;
         animation: fadeInUp 1s ease 0.3s both;
     }
     
-    /* Premium Glass Card */
+    /* Glass Card - Login/Register Box */
     .glass-card-premium {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(255, 255, 255, 0.25);
         backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 24px;
-        padding: 2rem;
-        margin: 1rem 0;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(155, 77, 202, 0.3);
+        border-radius: 30px;
+        padding: 2.5rem;
+        margin: 2rem 0;
+        box-shadow: 0 20px 50px rgba(106, 27, 154, 0.3);
         transition: all 0.3s ease;
         animation: fadeIn 0.8s ease;
     }
     
     .glass-card-premium:hover {
         transform: translateY(-5px);
-        box-shadow: 0 12px 48px rgba(123, 47, 247, 0.3);
-        border-color: rgba(123, 47, 247, 0.3);
+        box-shadow: 0 25px 60px rgba(106, 27, 154, 0.4);
+        border-color: rgba(155, 77, 202, 0.6);
     }
     
-    /* Animated Result Banners */
     .fake-banner-premium {
         background: linear-gradient(135deg, #ff416c, #ff4b2b);
         border-radius: 24px;
@@ -172,14 +188,13 @@ st.markdown("""
         color: white !important;
     }
     
-    /* Premium Stats Card */
     .stats-card-premium {
-        background: linear-gradient(135deg, #667eea, #764ba2);
+        background: linear-gradient(135deg, #8b5cf6, #a78bfa);
         border-radius: 20px;
         padding: 1.5rem;
         text-align: center;
         animation: float 3s ease infinite;
-        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        box-shadow: 0 10px 30px rgba(139, 92, 246, 0.4);
     }
     
     @keyframes float {
@@ -188,7 +203,11 @@ st.markdown("""
         100% { transform: translateY(0px); }
     }
     
-    /* Premium Badges */
+    .stats-card-premium h3,
+    .stats-card-premium p {
+        color: white !important;
+    }
+    
     .risk-badge-premium {
         display: inline-block;
         background: rgba(239, 68, 68, 0.2);
@@ -209,9 +228,8 @@ st.markdown("""
         100% { transform: scale(1); }
     }
     
-    /* Premium Button */
     .stButton > button {
-        background: linear-gradient(90deg, #7b2ff7, #00d2ff) !important;
+        background: linear-gradient(90deg, #8b5cf6, #a855f7) !important;
         color: white !important;
         border: none !important;
         border-radius: 50px !important;
@@ -219,7 +237,7 @@ st.markdown("""
         font-weight: 700 !important;
         font-size: 1rem !important;
         width: 100% !important;
-        box-shadow: 0 4px 15px rgba(123, 47, 247, 0.4) !important;
+        box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4) !important;
         transition: all 0.3s ease !important;
         position: relative;
         overflow: hidden;
@@ -227,7 +245,7 @@ st.markdown("""
     
     .stButton > button:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 8px 25px rgba(123, 47, 247, 0.6) !important;
+        box-shadow: 0 8px 25px rgba(139, 92, 246, 0.6) !important;
     }
     
     .stButton > button::after {
@@ -248,11 +266,10 @@ st.markdown("""
         height: 300px;
     }
     
-    /* Premium Input Fields */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {
-        background: rgba(255, 255, 255, 0.95) !important;
-        border: 2px solid rgba(123, 47, 247, 0.3) !important;
+        background: rgba(255, 255, 255, 0.9) !important;
+        border: 2px solid rgba(139, 92, 246, 0.4) !important;
         border-radius: 15px !important;
         color: #1a1a2e !important;
         font-size: 1rem !important;
@@ -262,28 +279,31 @@ st.markdown("""
     
     .stTextInput > div > div > input:focus,
     .stTextArea > div > div > textarea:focus {
-        border-color: #7b2ff7 !important;
-        box-shadow: 0 0 0 3px rgba(123, 47, 247, 0.2) !important;
+        border-color: #8b5cf6 !important;
+        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3) !important;
         transform: scale(1.02);
     }
     
-    /* Premium Sidebar */
     section[data-testid="stSidebar"] {
-        background: rgba(10, 8, 30, 0.98) !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+        background: rgba(106, 27, 154, 0.2) !important;
         backdrop-filter: blur(10px);
+        border-right: 1px solid rgba(155, 77, 202, 0.3) !important;
     }
     
     section[data-testid="stSidebar"] * {
-        color: #e2e8f0 !important;
+        color: #1e1e3f !important;
     }
     
     .sidebar-user-premium {
-        background: linear-gradient(135deg, #7b2ff7, #00d2ff);
+        background: linear-gradient(135deg, #8b5cf6, #a855f7);
         border-radius: 15px;
         padding: 1rem;
         margin: 1rem 0;
         animation: slideInRight 0.5s ease;
+    }
+    
+    .sidebar-user-premium p {
+        color: white !important;
     }
     
     @keyframes slideInRight {
@@ -297,10 +317,9 @@ st.markdown("""
         }
     }
     
-    /* Premium Email Alert Box */
     .email-alert-premium {
-        background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 165, 0, 0.1));
-        border-left: 5px solid #ffd700;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(168, 85, 247, 0.2));
+        border-left: 5px solid #8b5cf6;
         backdrop-filter: blur(10px);
         border-radius: 15px;
         padding: 1rem;
@@ -319,11 +338,10 @@ st.markdown("""
         }
     }
     
-    /* Premium Trusted Site Cards */
     .site-card-premium {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(255, 255, 255, 0.15);
         backdrop-filter: blur(5px);
-        border: 1px solid rgba(0, 210, 255, 0.3);
+        border: 1px solid rgba(139, 92, 246, 0.3);
         border-radius: 20px;
         padding: 1.5rem;
         text-align: center;
@@ -333,8 +351,8 @@ st.markdown("""
     
     .site-card-premium:hover {
         transform: scale(1.05) rotateY(5deg);
-        border-color: #7b2ff7;
-        box-shadow: 0 10px 30px rgba(123, 47, 247, 0.3);
+        border-color: #8b5cf6;
+        box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
     }
     
     @keyframes fadeInScale {
@@ -349,7 +367,7 @@ st.markdown("""
     }
     
     .site-card-premium a {
-        color: #00d2ff !important;
+        color: #8b5cf6 !important;
         text-decoration: none;
         font-weight: 600;
         font-size: 1rem;
@@ -357,23 +375,23 @@ st.markdown("""
         margin-top: 0.5rem;
     }
     
-    /* Premium Progress Bar */
     .stProgress > div > div {
-        background: linear-gradient(90deg, #7b2ff7, #00d2ff) !important;
+        background: linear-gradient(90deg, #8b5cf6, #a855f7) !important;
         border-radius: 10px !important;
         transition: width 1s ease !important;
     }
     
-    /* Premium Tabs */
     .stTabs [data-baseweb="tab-list"] {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(5px);
         border-radius: 50px;
         padding: 0.3rem;
         gap: 0.5rem;
+        border: 1px solid rgba(139, 92, 246, 0.3);
     }
     
     .stTabs [data-baseweb="tab"] {
-        color: #94a3b8 !important;
+        color: #1e1e3f !important;
         font-weight: 600;
         border-radius: 50px;
         padding: 0.5rem 1.5rem;
@@ -381,23 +399,25 @@ st.markdown("""
     }
     
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(90deg, #7b2ff7, #00d2ff) !important;
+        background: linear-gradient(90deg, #8b5cf6, #a855f7) !important;
         color: white !important;
         transform: scale(1.05);
+        padding-top: 0 !important;
+        margin-top: 0 !important;
     }
+
     
-    /* Premium Divider */
+    
     hr {
         border: none;
         height: 2px;
-        background: linear-gradient(90deg, transparent, #7b2ff7, #00d2ff, transparent);
+        background: linear-gradient(90deg, transparent, #8b5cf6, #a855f7, transparent);
         margin: 2rem 0;
     }
     
-    /* Premium Footer */
     .footer-premium {
         text-align: center;
-        color: #475569 !important;
+        color: #6b21a5 !important;
         padding: 2rem;
         font-size: 0.85rem;
         position: relative;
@@ -411,7 +431,7 @@ st.markdown("""
         left: -100%;
         width: 100%;
         height: 1px;
-        background: linear-gradient(90deg, transparent, #7b2ff7, #00d2ff, transparent);
+        background: linear-gradient(90deg, transparent, #8b5cf6, #a855f7, transparent);
         animation: slide 3s infinite;
     }
     
@@ -420,7 +440,6 @@ st.markdown("""
         100% { left: 100%; }
     }
     
-    /* Loading Animation */
     .loading-premium {
         text-align: center;
         padding: 2rem;
@@ -438,7 +457,6 @@ st.markdown("""
         100% { transform: rotate(360deg); }
     }
     
-    /* Admin Alert Badge */
     .admin-badge {
         position: fixed;
         top: 10px;
@@ -457,14 +475,94 @@ st.markdown("""
         0%, 100% { transform: translateY(0); }
         50% { transform: translateY(-5px); }
     }
+    
+    /* ===== Share button styles ===== */
+    .share-button {
+        background: linear-gradient(135deg, #8b5cf6, #a855f7);
+        color: white !important;
+        border: none;
+        border-radius: 40px;
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-block;
+        margin: 0.2rem;
+        transition: all 0.3s ease;
+        animation: float 3s ease-in-out infinite;
+        box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);
+    }
+    
+    .share-button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
+    }
+    
+    /* ===== Light Purple File Uploader ===== */
+    div[data-testid="stFileUploader"] {
+        background: #f3e8ff !important;
+        border: 2px dashed #8b5cf6 !important;
+        border-radius: 16px !important;
+        padding: 2rem !important;
+    }
+    
+    div[data-testid="stFileUploader"] [data-testid="stFileUploaderDropzone"] {
+        background: #f3e8ff !important;
+    }
+    
+    div[data-testid="stFileUploader"] [data-testid="stFileUploaderDropzone"] div {
+        color: #4a1d6d !important;
+    }
+    
+    /* ===== Site Card for Trusted Sites ===== */
+    .site-card {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        border-radius: 16px;
+        padding: 1rem;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .site-card:hover {
+        transform: translateY(-5px);
+        border-color: #8b5cf6;
+        box-shadow: 0 10px 25px rgba(139, 92, 246, 0.2);
+    }
+    
+    .site-card img {
+        border-radius: 8px;
+        margin-bottom: 8px;
+    }
+    
+    .site-card a {
+        color: #8b5cf6 !important;
+        text-decoration: none;
+        font-weight: 600;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-# ADMIN ALERT FUNCTION
-# ─────────────────────────────────────────────
+# ==================== OCR CLEANING FUNCTION ====================
+def clean_ocr_text(text):
+    """Remove common OCR artifacts like keyboard_arrowright, arrows, etc."""
+    artifacts = [
+        'keyboard_arrowright', 'keyboard_arrowleft', 'arrow_forward',
+        'arrow_back', 'arrow_upward', 'arrow_downward', 'chevron_right',
+        'chevron_left', '➡️', '⬅️', '⬆️', '⬇️', '▶️', '◀️',
+        'keyboard_arrow_right', 'keyboard_arrow_left',
+        'keyToaid', 'Entroweight', 'keyToaid Entroweight'
+    ]
+    cleaned = text
+    for artifact in artifacts:
+        cleaned = cleaned.replace(artifact, '')
+    # Remove extra blank lines
+    lines = [line.strip() for line in cleaned.split('\n') if line.strip()]
+    return '\n'.join(lines)
+
+# ==================== ADMIN ALERT FUNCTION (unchanged) ====================
 def send_admin_alert(user_email, user_name, action="login"):
-    """Send alert to admin when user logs in"""
     try:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = f"👤 User {action.capitalize()} Alert - JobShield AI"
@@ -478,15 +576,15 @@ def send_admin_alert(user_email, user_name, action="login"):
         <html>
         <body style="margin:0;padding:0;background:#1a1a2e;font-family:'Inter',sans-serif;">
             <div style="max-width:600px;margin:30px auto;padding:20px;">
-                <div style="background:linear-gradient(135deg,#7b2ff7,#00d2ff);border-radius:20px;padding:2rem;text-align:center;margin-bottom:20px;">
+                <div style="background:linear-gradient(135deg,#8b5cf6,#a855f7);border-radius:20px;padding:2rem;text-align:center;margin-bottom:20px;">
                     <h1 style="color:white;margin:0;">🛡️ JobShield AI</h1>
                     <p style="color:rgba(255,255,255,0.9);margin:5px 0 0;">User Activity Alert</p>
                 </div>
                 
                 <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:2rem;">
-                    <h2 style="color:#00d2ff;margin:0 0 20px;">🔔 New User {action.capitalize()}</h2>
+                    <h2 style="color:#a855f7;margin:0 0 20px;">🔔 New User {action.capitalize()}</h2>
                     
-                    <div style="background:rgba(123,47,247,0.1);border-radius:15px;padding:1.5rem;margin:10px 0;">
+                    <div style="background:rgba(139,92,246,0.1);border-radius:15px;padding:1.5rem;margin:10px 0;">
                         <p style="color:#e2e8f0;margin:10px 0;"><strong>👤 User:</strong> {user_name}</p>
                         <p style="color:#e2e8f0;margin:10px 0;"><strong>📧 Email:</strong> {user_email}</p>
                         <p style="color:#e2e8f0;margin:10px 0;"><strong>⏰ Time:</strong> {current_time}</p>
@@ -517,9 +615,7 @@ def send_admin_alert(user_email, user_name, action="login"):
         print(f"Admin alert failed: {e}")
         return False
 
-# ─────────────────────────────────────────────
-# USER MANAGEMENT
-# ─────────────────────────────────────────────
+# ==================== USER MANAGEMENT (unchanged) ====================
 def load_users():
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, 'r') as f:
@@ -549,9 +645,7 @@ def login_user(email, password):
         return False, "Wrong password!"
     return True, users[email]['name']
 
-# ─────────────────────────────────────────────
-# ENHANCED EMAIL FUNCTION
-# ─────────────────────────────────────────────
+# ==================== ENHANCED EMAIL FUNCTION (unchanged) ====================
 def send_email_alert(to_email, user_name, job_text, result, score, suggestions,
                      trigger_hits, detected_lang="en", translated_text=""):
     try:
@@ -589,8 +683,8 @@ def send_email_alert(to_email, user_name, job_text, result, score, suggestions,
         translation_block = ""
         if detected_lang != 'en' and translated_text:
             translation_block = f"""
-            <div style="background:rgba(0,210,255,0.1);border-radius:15px;padding:1rem;margin:15px 0;border-left:4px solid #00d2ff;">
-                <p style="color:#00d2ff;font-weight:600;margin:0 0 5px;">📝 English Translation</p>
+            <div style="background:rgba(139,92,246,0.1);border-radius:15px;padding:1rem;margin:15px 0;border-left:4px solid #8b5cf6;">
+                <p style="color:#8b5cf6;font-weight:600;margin:0 0 5px;">📝 English Translation</p>
                 <p style="color:#94a3b8;margin:0;">{translated_text[:400]}{'...' if len(translated_text)>400 else ''}</p>
             </div>"""
         
@@ -602,11 +696,11 @@ def send_email_alert(to_email, user_name, job_text, result, score, suggestions,
         <body style="margin:0;padding:0;background:#1a1a2e;font-family:'Inter',sans-serif;">
             <div style="max-width:600px;margin:30px auto;padding:20px;">
                 <div style="text-align:center;margin-bottom:30px;">
-                    <h1 style="background:linear-gradient(90deg,#00d2ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:2.5rem;margin:0;">🛡️ JobShield AI</h1>
+                    <h1 style="background:linear-gradient(90deg,#8b5cf6,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:2.5rem;margin:0;">🛡️ JobShield AI</h1>
                     <p style="color:#94a3b8;">Fake Job Detection Report</p>
                 </div>
                 
-                <p style="color:#e2e8f0;">Hello <strong style="color:#00d2ff;">{user_name}</strong>,</p>
+                <p style="color:#e2e8f0;">Hello <strong style="color:#8b5cf6;">{user_name}</strong>,</p>
                 
                 <div style="background:{banner_grad};border-radius:24px;padding:2rem;text-align:center;margin:20px 0;box-shadow:0 0 30px {'#ff416c' if is_fake else '#11998e'}80;">
                     <h2 style="color:white;margin:0;">{status_label}</h2>
@@ -615,8 +709,8 @@ def send_email_alert(to_email, user_name, job_text, result, score, suggestions,
                 </div>
                 
                 <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:1.5rem;margin:15px 0;">
-                    <p style="color:#00d2ff;font-weight:700;">🌍 Language Analysis</p>
-                    <p style="color:#e2e8f0;">Detected Language: <strong style="color:#7dd3fc;">{lang_display}</strong></p>
+                    <p style="color:#8b5cf6;font-weight:700;">🌍 Language Analysis</p>
+                    <p style="color:#e2e8f0;">Detected Language: <strong style="color:#a855f7;">{lang_display}</strong></p>
                     {translation_block}
                 </div>
                 
@@ -625,7 +719,7 @@ def send_email_alert(to_email, user_name, job_text, result, score, suggestions,
                     <div>{badge_html}</div>
                 </div>
                 
-                <div style="background:rgba(123,47,247,0.15);border:1px solid rgba(123,47,247,0.4);border-radius:20px;padding:1.5rem;margin:15px 0;">
+                <div style="background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.4);border-radius:20px;padding:1.5rem;margin:15px 0;">
                     <p style="color:#a78bfa;font-weight:700;">💡 Recommendations</p>
                     <table style="width:100%;border-collapse:collapse;">{sugg_rows}</table>
                 </div>
@@ -652,13 +746,10 @@ def send_email_alert(to_email, user_name, job_text, result, score, suggestions,
     except Exception:
         return False
 
-# ─────────────────────────────────────────────
-# MODEL TRAINING
-# ─────────────────────────────────────────────
+# ==================== MODEL TRAINING (unchanged) ====================
 @st.cache_resource
 def train_model():
     try:
-        # Try Excel first
         try:
             df = pd.read_excel(DATASET_PATH, engine='openpyxl')
         except Exception:
@@ -673,7 +764,6 @@ def train_model():
                 except Exception:
                     continue
         
-        # Combine text columns
         text_cols = [c for c in ['description','company_profile','requirements','benefits','title'] if c in df.columns]
         if not text_cols:
             return None, None
@@ -709,9 +799,7 @@ def train_model():
 
 model, vectorizer = train_model()
 
-# ─────────────────────────────────────────────
-# TRANSLATION FUNCTION
-# ─────────────────────────────────────────────
+# ==================== TRANSLATION FUNCTION (unchanged) ====================
 def translate_to_english(text):
     try:
         detected_lang = detect(text)
@@ -730,9 +818,7 @@ def translate_to_english(text):
             pass
     return text, detected_lang
 
-# ─────────────────────────────────────────────
-# JOB ANALYSIS FUNCTION
-# ─────────────────────────────────────────────
+# ==================== JOB ANALYSIS FUNCTION (unchanged) ====================
 def analyze_job(job_text):
     if not job_text or model is None:
         return None
@@ -740,7 +826,6 @@ def analyze_job(job_text):
     try:
         translated, detected_lang = translate_to_english(job_text)
         
-        # Risk keywords
         trigger_keywords = {
             'urgent': '🚨 Urgent Hiring',
             'immediate': '⚡ Immediate Joining',
@@ -790,13 +875,11 @@ def analyze_job(job_text):
         
         trigger_hits = list(set(trigger_hits))[:8]
         
-        # ML prediction
         X = vectorizer.transform([translated])
         proba = model.predict_proba(X)[0]
         score = proba[1] * 100
         result = "FAKE" if score >= 50 else "REAL"
         
-        # Suggestions
         suggestions = [
             "📋 Verify company on LinkedIn and Glassdoor",
             "🔍 Check official website domain carefully",
@@ -820,27 +903,71 @@ def analyze_job(job_text):
     except Exception:
         return None
 
-# ─────────────────────────────────────────────
-# TRUSTED SITES
-# ─────────────────────────────────────────────
+# ==================== TRUSTED SITES (unchanged) ====================
 def get_trusted_sites():
     return [
-        {'name': 'LinkedIn', 'url': 'https://www.linkedin.com/jobs', 'icon': '🔵'},
-        {'name': 'Naukri', 'url': 'https://www.naukri.com', 'icon': '🟠'},
-        {'name': 'Indeed', 'url': 'https://www.indeed.com', 'icon': '🔷'},
-        {'name': 'Glassdoor', 'url': 'https://www.glassdoor.com', 'icon': '🟢'},
-        {'name': 'Monster', 'url': 'https://www.monster.com', 'icon': '🟣'},
-        {'name': 'Shine', 'url': 'https://www.shine.com', 'icon': '⭐'},
+        {'name': 'LinkedIn',  'url': 'https://www.linkedin.com/jobs', 'logo': 'https://www.google.com/s2/favicons?domain=linkedin.com&sz=64'},
+        {'name': 'Naukri',    'url': 'https://www.naukri.com',        'logo': 'https://www.google.com/s2/favicons?domain=naukri.com&sz=64'},
+        {'name': 'Indeed',    'url': 'https://www.indeed.com',        'logo': 'https://www.google.com/s2/favicons?domain=indeed.com&sz=64'},
+        {'name': 'Glassdoor', 'url': 'https://www.glassdoor.com',     'logo': 'https://www.google.com/s2/favicons?domain=glassdoor.com&sz=64'},
+        {'name': 'Monster',   'url': 'https://www.monster.com',       'logo': 'https://www.google.com/s2/favicons?domain=monster.com&sz=64'},
+        {'name': 'Shine',     'url': 'https://www.shine.com',         'logo': 'https://www.google.com/s2/favicons?domain=shine.com&sz=64'},
     ]
 
-# ─────────────────────────────────────────────
-# AUTH PAGE - PREMIUM DESIGN
-# ─────────────────────────────────────────────
+# ==================== NEW: OCR FUNCTION ====================
+def extract_text_from_image(uploaded_file):
+    if not OCR_AVAILABLE:
+        return None, "Tesseract OCR not installed. Please install from https://github.com/UB-Mannheim/tesseract/wiki"
+    try:
+        image = Image.open(uploaded_file)
+        text = pytesseract.image_to_string(image)
+        return text, None
+    except Exception as e:
+        return None, str(e)
+
+# ==================== NEW: PAGE FUNCTIONS ====================
+def show_history_page():
+    st.markdown("## 📜 Scan History")
+    if not st.session_state.history:
+        st.info("No scans yet. Go to Scanner and analyze some jobs!")
+        return
+    
+    df = pd.DataFrame(st.session_state.history)
+    st.dataframe(df, use_container_width=True)
+    
+    if st.button("🗑️ Clear History"):
+        st.session_state.history = []
+        st.rerun()
+
+def show_analytics_page():
+    st.markdown("## 📊 Analytics")
+    history = st.session_state.history
+    if not history:
+        st.info("No data yet.")
+        return
+    
+    total = len(history)
+    fake = sum(1 for h in history if h['result'] == 'FAKE')
+    real = total - fake
+    
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Scans", total)
+    col2.metric("Fake Jobs", fake, delta=fake, delta_color="inverse")
+    col3.metric("Safe Jobs", real)
+    
+    # Simple pie chart
+    if MATPLOTLIB_AVAILABLE:
+        fig, ax = plt.subplots()
+        ax.pie([fake, real], labels=['Fake', 'Safe'], autopct='%1.1f%%', colors=['#ff6b6b','#51cf66'])
+        st.pyplot(fig)
+    else:
+        st.write("Install matplotlib to see charts.")
+
+# ==================== AUTH PAGE (Updated - Single Box with Login & Register) ====================
 def show_auth_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        # Premium Hero
         st.markdown("""
         <div class="hero-premium">
             <h1 class="hero-title-premium">🛡️ JobShield AI</h1>
@@ -848,17 +975,18 @@ def show_auth_page():
         </div>
         """, unsafe_allow_html=True)
         
-        # Premium Auth Card
-        st.markdown('<div class="glass-card-premium">', unsafe_allow_html=True)
+        # Single Glass Card with both Login and Register
         
-        tab1, tab2 = st.tabs(["🔐 Login", "📝 Register"])
+        
+        # Tabs inside the same box
+        tab1, tab2 = st.tabs(["🔐 LOGIN", "📝 REGISTER"])
         
         with tab1:
             st.markdown("### 👋 Welcome Back!")
             email = st.text_input("📧 Email", placeholder="Enter your email", key="login_email")
             password = st.text_input("🔑 Password", type="password", placeholder="Enter password", key="login_pass")
             
-            if st.button("🚀 Login Now", use_container_width=True):
+            if st.button("🚀 LOGIN NOW", use_container_width=True):
                 if email and password:
                     success, result = login_user(email, password)
                     if success:
@@ -866,12 +994,11 @@ def show_auth_page():
                         st.session_state.user_email = email
                         st.session_state.user_name = result
                         
-                        # Send admin alert on login
                         with st.spinner("📧 Sending security alert..."):
                             send_admin_alert(email, result, "login")
                         
                         st.success(f"✅ Welcome back, {result}!")
-                        st.balloons()
+                        
                         time.sleep(1)
                         st.rerun()
                     else:
@@ -880,13 +1007,13 @@ def show_auth_page():
                     st.warning("⚠️ Fill all fields!")
         
         with tab2:
-            st.markdown("### ✨ Create Account")
+            st.markdown("### ✨ Create New Account")
             name = st.text_input("👤 Full Name", placeholder="Enter your name", key="reg_name")
             email = st.text_input("📧 Email", placeholder="Enter your email", key="reg_email")
             password = st.text_input("🔑 Password", type="password", placeholder="Create password", key="reg_pass")
             confirm = st.text_input("🔒 Confirm Password", type="password", placeholder="Confirm password", key="reg_confirm")
             
-            if st.button("📝 Register Now", use_container_width=True):
+            if st.button("📝 REGISTER NOW", use_container_width=True):
                 if name and email and password and confirm:
                     if password != confirm:
                         st.error("❌ Passwords don't match!")
@@ -894,7 +1021,7 @@ def show_auth_page():
                         success, msg = register_user(name, email, password)
                         if success:
                             st.success(f"✅ {msg} Please login!")
-                            st.snow()
+                            
                         else:
                             st.error(f"❌ {msg}")
                 else:
@@ -902,33 +1029,31 @@ def show_auth_page():
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Stats
+        # Stats below the box
         col_a, col_b, col_c = st.columns(3)
         with col_a:
             st.markdown("""
             <div class="stats-card-premium">
                 <h3 style="color:white;">20+</h3>
-                <p style="color:rgba(255,255,255,0.8);">Languages</p>
+                <p style="color:rgba(255,255,255,0.9);">Languages</p>
             </div>
             """, unsafe_allow_html=True)
         with col_b:
             st.markdown("""
             <div class="stats-card-premium">
                 <h3 style="color:white;">AI</h3>
-                <p style="color:rgba(255,255,255,0.8);">Powered</p>
+                <p style="color:rgba(255,255,255,0.9);">Powered</p>
             </div>
             """, unsafe_allow_html=True)
         with col_c:
             st.markdown("""
             <div class="stats-card-premium">
                 <h3 style="color:white;">100%</h3>
-                <p style="color:rgba(255,255,255,0.8);">Free</p>
+                <p style="color:rgba(255,255,255,0.9);">Free</p>
             </div>
             """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-# MAIN PAGE - PREMIUM DESIGN
-# ─────────────────────────────────────────────
+# ==================== MAIN PAGE (modified to add navigation) ====================
 def show_main_page():
     # Admin Alert Badge
     st.markdown("""
@@ -937,39 +1062,44 @@ def show_main_page():
     </div>
     """, unsafe_allow_html=True)
     
-    # Premium Sidebar
+    # Premium Sidebar (modified with navigation)
     with st.sidebar:
         st.markdown("""
         <div style="text-align:center; padding:1rem;">
             <h1 style="font-size:2rem; margin:0;">🛡️</h1>
-            <h3 style="color:#00d2ff; margin:0;">JobShield AI</h3>
+            <h3 style="color:#8b5cf6; margin:0;">JobShield AI</h3>
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown(f"""
         <div class="sidebar-user-premium">
             <p style="color:white; margin:0;">👤 {st.session_state.user_name}</p>
-            <p style="color:rgba(255,255,255,0.8); font-size:0.8rem; margin:5px 0 0;">{st.session_state.user_email}</p>
+            <p style="color:rgba(255,255,255,0.9); font-size:0.8rem; margin:5px 0 0;">{st.session_state.user_email}</p>
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown("---")
         
-        # Quick Stats
+        # Navigation
+        page = st.radio("Navigation", ["🔍 Scanner", "📜 History", "📊 Analytics"])
+        
+        st.markdown("---")
+        
+        # Quick Stats (unchanged)
         st.markdown("### 📊 Quick Stats")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("""
-            <div style="background:rgba(123,47,247,0.1); border-radius:15px; padding:1rem; text-align:center;">
-                <p style="color:#00d2ff; font-size:1.5rem; margin:0;">20+</p>
-                <p style="color:#94a3b8; margin:0;">Languages</p>
+            <div style="background:rgba(139,92,246,0.15); border-radius:15px; padding:1rem; text-align:center;">
+                <p style="color:#8b5cf6; font-size:1.5rem; margin:0;">20+</p>
+                <p style="color:#4a4a6a; margin:0;">Languages</p>
             </div>
             """, unsafe_allow_html=True)
         with col2:
             st.markdown("""
-            <div style="background:rgba(123,47,247,0.1); border-radius:15px; padding:1rem; text-align:center;">
-                <p style="color:#00d2ff; font-size:1.5rem; margin:0;">ML</p>
-                <p style="color:#94a3b8; margin:0;">Powered</p>
+            <div style="background:rgba(139,92,246,0.15); border-radius:15px; padding:1rem; text-align:center;">
+                <p style="color:#8b5cf6; font-size:1.5rem; margin:0;">ML</p>
+                <p style="color:#4a4a6a; margin:0;">Powered</p>
             </div>
             """, unsafe_allow_html=True)
         
@@ -979,178 +1109,272 @@ def show_main_page():
             st.session_state.logged_in = False
             st.rerun()
     
-    # Main Content
-    st.markdown("""
-    <div class="hero-premium">
-        <h1 class="hero-title-premium">🔍 Job Fraud Detector</h1>
-        <p class="hero-sub-premium">Paste any job posting - we'll analyze it in 20+ languages</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Input Section
-    st.markdown('<div class="glass-card-premium">', unsafe_allow_html=True)
-    
-    input_method = st.radio(
-        "Choose input method:",
-        ["📝 Paste Text", "🔗 Job URL", "📧 Email Content"],
-        horizontal=True
-    )
-    
-    job_text = ""
-    
-    if input_method == "📝 Paste Text":
-        st.markdown("#### 📝 Paste Job Description")
-        job_text = st.text_area(
-            "Paste the job posting here:",
-            height=200,
-            placeholder="Copy and paste the suspicious job description here..."
+    # Page routing
+    if page == "🔍 Scanner":
+        # ===== Main Scanner UI (mostly unchanged, but replace email with image upload) =====
+        st.markdown("""
+        <div class="hero-premium">
+            <h1 class="hero-title-premium">🔍 Job Fraud Detector</h1>
+            <p class="hero-sub-premium">Paste any job posting or upload screenshot - we'll analyze it in 20+ languages</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        
+        
+        # REPLACED: Email Content → Image Upload
+        input_method = st.radio(
+            "Choose input method:",
+            ["📝 Paste Text", "🔗 Job URL", "📸 Image Upload"],
+            horizontal=True
         )
-    elif input_method == "🔗 Job URL":
-        st.markdown("#### 🔗 Enter Job URL")
-        url = st.text_input("Paste the job URL:", placeholder="https://...")
-        if url:
-            domain = url.split('/')[2] if '//' in url else url
-            trusted = ['linkedin.com', 'naukri.com', 'indeed.com', 'glassdoor.com', 
-                      'monster.com', 'shine.com', 'freshersworld.com', 'timesjobs.com']
-            if any(t in domain for t in trusted):
-                st.success(f"✅ {domain} is a trusted portal!")
-                job_text = f"Job from trusted portal {domain}"
-            else:
-                st.warning(f"⚠️ {domain} is not a known trusted portal!")
-                job_text = f"suspicious unknown domain {domain} unverified link job posting fee deposit urgent"
-    else:
-        st.markdown("#### 📧 Paste Job Email")
-        job_text = st.text_area(
-            "Paste the job-related email:",
-            height=200,
-            placeholder="Copy and paste the suspicious job email here..."
-        )
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Analyze Button
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        analyze_clicked = st.button("🔍 ANALYZE JOB - DETECT FRAUD", use_container_width=True)
-    
-    # Results Section
-    if analyze_clicked:
-        if not job_text.strip():
-            st.warning("⚠️ Please enter job content first!")
-        elif model is None:
-            st.error("❌ AI Model not loaded - check dataset path!")
-        else:
-            with st.spinner("🔍 Analyzing with AI Engine..."):
-                analysis = analyze_job(job_text)
-            
-            if not analysis:
-                st.error("❌ Analysis failed. Please try again.")
-            else:
-                st.markdown("---")
-                
-                # Result Banner
-                if analysis['result'] == "FAKE":
-                    st.markdown(f"""
-                    <div class="fake-banner-premium">
-                        <h2>🚩 WARNING: FAKE JOB DETECTED!</h2>
-                        <p style="font-size:1.5rem;"><strong>Fraud Probability: {analysis['score']:.1f}%</strong></p>
-                        <p style="font-size:1.1rem;">⛔ Do NOT apply or pay any money for this job!</p>
-                    </div>
-                    """, unsafe_allow_html=True)
+        
+        job_text = ""
+        
+        if input_method == "📝 Paste Text":
+            st.markdown("#### 📝 Paste Job Description")
+            job_text = st.text_area(
+                "Paste the job posting here:",
+                height=200,
+                placeholder="Copy and paste the suspicious job description here..."
+            )
+        elif input_method == "🔗 Job URL":
+            st.markdown("#### 🔗 Enter Job URL")
+            url = st.text_input("Paste the job URL:", placeholder="https://...")
+            if url:
+                domain = url.split('/')[2] if '//' in url else url
+                trusted = [ # Indian Job Portals
+                    'naukri.com', 'shine.com', 'monsterindia.com', 'timesjobs.com', 'freshersworld.com',
+                    'careers360.com', 'indeed.co.in', 'linkedin.com', 'glassdoor.co.in', 'foundit.in',
+                    'apna.co', 'quikrjobs.com', 'click.in', 'hireclap.com', 'workindia.in',
+                    'internshala.com', 'hellotasks.com', 'urbanpro.com', 'babajob.com', 'hirect.in',
+                    
+                    # Global Job Portals
+                    'indeed.com', 'monster.com', 'careerbuilder.com', 'ziprecruiter.com', 'simplyhired.com',
+                    'dice.com', 'upwork.com', 'freelancer.com', 'fiverr.com', 'toptal.com',
+                    'angel.co', 'wellfound.com', 'hired.com', 'landing.jobs', 'remoteok.com',
+                    'weworkremotely.com', 'flexjobs.com', 'virtualvocations.com', 'jobspresso.co',
+                    
+                    # Indian MNCs & Tech Companies
+                    'tcs.com', 'infosys.com', 'wipro.com', 'hcl.com', 'techmahindra.com',
+                    'lti.com', 'mindtree.com', 'cognizant.com', 'capgemini.com', 'accenture.com',
+                    'ibm.com', 'microsoft.com', 'google.co.in', 'amazon.in', 'flipkart.com',
+                    'paytm.com', 'phonepe.com', 'razorpay.com', 'zomato.com', 'swiggy.com',
+                    'ola.com', 'uber.com', 'oyo.com', 'makemytrip.com', 'goibibo.com',
+                    'byjus.com', 'unacademy.com', 'vedantu.com', 'upgrad.com', 'coursera.com',
+                    
+                    # Global Tech Companies
+                    'apple.com', 'meta.com', 'facebook.com', 'twitter.com', 'netflix.com',
+                    'adobe.com', 'salesforce.com', 'oracle.com', 'sap.com', 'vmware.com',
+                    'cisco.com', 'intel.com', 'nvidia.com', 'amd.com', 'qualcomm.com',
+                    'dell.com', 'hp.com', 'lenovo.com', 'sony.com', 'samsung.com',
+                    'lg.com', 'panasonic.com', 'toshiba.com', 'hitachi.com', 'philips.com',
+                    'siemens.com', 'ge.com', '3m.com', 'bosch.com', 'honeywell.com',
+                    
+                    # E-commerce & Retail
+                    'walmart.com', 'target.com', 'bestbuy.com', 'homedepot.com', 'lowes.com',
+                    'ebay.com', 'etsy.com', 'shopify.com', 'alibaba.com', 'aliexpress.com',
+                    
+                    # Banking & Finance
+                    'icicibank.com', 'hdfcbank.com', 'sbicard.com', 'axisbank.com', 'kotak.com',
+                    'goldmansachs.com', 'jpmorgan.com', 'morganstanley.com', 'credit-suisse.com',
+                    'paypal.com', 'stripe.com', 'square.com', 'robinhood.com',
+                    
+                    # Telecom & Media
+                    'airtel.com', 'jio.com', 'vodafone.com', 'idea.com', 'bsnl.co.in',
+                    'disney.com', 'netflix.com', 'spotify.com', 'youtube.com', 'hotstar.com',
+                    
+                    # Government & Education
+                    'gov.in', 'nic.in', 'upsc.gov.in', 'ssc.nic.in', 'ugc.ac.in',
+                    'iit.ac.in', 'nit.edu', 'annauniv.edu', 'vtu.ac.in', 'jntuh.ac.in',
+                    
+                    # Healthcare
+                    'apollohospitals.com', 'fortishealthcare.com', 'maxhealthcare.com', 'medanta.org',
+                    'pfizer.com', 'novartis.com', 'roche.com', 'merck.com', 'johnsonandjohnson.com',
+                    
+                    # Automobile
+                    'toyota.com', 'honda.com', 'hyundai.com', 'marutisuzuki.com', 'tata.com',
+                    'mahindra.com', 'bmw.com', 'mercedes-benz.com', 'audi.com', 'ford.com',
+                    
+                    # Airlines & Travel
+                    'airindia.com', 'indigo.in', 'spicejet.com', 'goair.in', 'emirates.com',
+                    'qatarairways.com', 'singaporeair.com', 'britishairways.com', 'lufthansa.com',
+                    
+                    # Others
+                    'zoom.us', 'slack.com', 'dropbox.com', 'box.com', 'github.com',
+                    'gitlab.com', 'bitbucket.org', 'atlassian.com', 'jira.com', 'trello.com'
+                ]
+                if any(t in domain for t in trusted):
+                    st.success(f"✅ {domain} is a trusted portal!")
+                    job_text = f"Job from trusted portal {domain}"
                 else:
-                    st.markdown(f"""
-                    <div class="genuine-banner-premium">
-                        <h2>✅ LIKELY GENUINE JOB</h2>
-                        <p style="font-size:1.5rem;"><strong>Safety Score: {100 - analysis['score']:.1f}%</strong></p>
-                        <p style="font-size:1.1rem;">Still verify company details before applying.</p>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.warning(f"⚠️ {domain} is not a known trusted portal!")
+                    job_text = f"suspicious unknown domain {domain} unverified link job posting fee deposit urgent"
+        else:  # Image Upload
+            st.markdown("#### 📸 Upload Job Screenshot")
+            uploaded_file = st.file_uploader(
+                "Choose an image...",
+                type=['png', 'jpg', 'jpeg', 'bmp'],
+                help="Upload screenshot of job posting"
+            )
+            if uploaded_file is not None:
+                st.image(uploaded_file, caption="Uploaded Screenshot", width=300)
                 
-                # Auto Email
-                with st.spinner("📧 Sending analysis report to your email..."):
-                    auto_sent = send_email_alert(
-                        to_email=st.session_state.user_email,
-                        user_name=st.session_state.user_name,
-                        job_text=job_text,
-                        result=analysis['result'],
-                        score=analysis['score'],
-                        suggestions=analysis['suggestions'],
-                        trigger_hits=analysis['trigger_hits'],
-                        detected_lang=analysis['detected_lang'],
-                        translated_text=analysis['translated_text'],
-                    )
-                
-                if auto_sent:
-                    st.markdown(f"""
-                    <div class="email-alert-premium">
-                        📧 Analysis report sent to <strong>{st.session_state.user_email}</strong>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.warning("⚠️ Auto email failed - check SMTP settings.")
-                
-                st.markdown("<br>", unsafe_allow_html=True)
-                
-                # Two Column Analysis
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown('<div class="glass-card-premium">', unsafe_allow_html=True)
-                    st.markdown("#### 🌍 Language Analysis")
-                    
-                    lang_map = {
-                        'ta':'Tamil','hi':'Hindi','en':'English','ar':'Arabic','zh-cn':'Chinese',
-                        'es':'Spanish','fr':'French','de':'German','ja':'Japanese','ko':'Korean',
-                        'ru':'Russian','pt':'Portuguese','id':'Indonesian','tr':'Turkish',
-                        'bn':'Bengali','vi':'Vietnamese','th':'Thai','ur':'Urdu',
-                    }
-                    lang_display = lang_map.get(analysis['detected_lang'], analysis['detected_lang'].upper())
-                    
-                    st.info(f"**Detected Language:** {lang_display}")
-                    
-                    if analysis['detected_lang'] != 'en':
-                        st.markdown("#### 📝 English Translation")
-                        st.info(analysis['translated_text'][:400])
-                    
-                    if analysis['trigger_hits']:
-                        st.markdown("#### ⚠️ Risk Indicators")
-                        for hit in analysis['trigger_hits']:
-                            st.markdown(f'<span class="risk-badge-premium">{hit}</span>', unsafe_allow_html=True)
+                with st.spinner("🔍 Extracting text from image..."):
+                    extracted_text, error = extract_text_from_image(uploaded_file)
+                    if extracted_text:
+                        st.success("✅ Text extracted successfully!")
+                        job_text = extracted_text
                     else:
-                        st.success("✅ No major risk keywords found")
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
+                        st.error(f"❌ {error}")
+                        job_text = ""
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            analyze_clicked = st.button("🔍 ANALYZE JOB - DETECT FRAUD", use_container_width=True)
+        
+        if analyze_clicked:
+            if not job_text.strip():
+                st.warning("⚠️ Please enter job content first!")
+            elif model is None:
+                st.error("❌ AI Model not loaded - check dataset path!")
+            else:
+                with st.spinner("🔍 Analyzing with AI Engine..."):
+                    analysis = analyze_job(job_text)
                 
-                with col2:
-                    st.markdown('<div class="glass-card-premium">', unsafe_allow_html=True)
-                    st.markdown("#### 💡 Recommendations")
+                if not analysis:
+                    st.error("❌ Analysis failed. Please try again.")
+                else:
+                    # Save to history (NEW)
+                    history_entry = {
+                        'timestamp': datetime.now().isoformat(),
+                        'job_text': job_text[:100],
+                        'result': analysis['result'],
+                        'score': analysis['score'],
+                        'language': analysis['detected_lang']
+                    }
+                    st.session_state.history.append(history_entry)
                     
-                    for s in analysis['suggestions']:
-                        st.markdown(f"- {s}")
+                    st.markdown("---")
                     
-                    st.markdown('</div>', unsafe_allow_html=True)
-                
-                # Trusted Sites
-                st.markdown("<br>", unsafe_allow_html=True)
-                heading = "### 🚨 Apply on These TRUSTED Platforms Instead!" if analysis['result'] == "FAKE" else "### 🏆 Top Trusted Job Platforms"
-                st.markdown(heading)
-                
-                cols = st.columns(6)
-                for i, site in enumerate(get_trusted_sites()):
-                    with cols[i]:
+                    if analysis['result'] == "FAKE":
                         st.markdown(f"""
-                        <div class="site-card-premium">
-                            <div style="font-size:2rem;">{site['icon']}</div>
-                            <a href="{site['url']}" target="_blank">{site['name']}</a>
+                        <div class="fake-banner-premium">
+                            <h2>🚩 WARNING: FAKE JOB DETECTED!</h2>
+                            <p style="font-size:1.5rem;"><strong>Fraud Probability: {analysis['score']:.1f}%</strong></p>
+                            <p style="font-size:1.1rem;">⛔ Do NOT apply or pay any money for this job!</p>
                         </div>
                         """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                        <div class="genuine-banner-premium">
+                            <h2>✅ LIKELY GENUINE JOB</h2>
+                            <p style="font-size:1.5rem;"><strong>Safety Score: {100 - analysis['score']:.1f}%</strong></p>
+                            <p style="font-size:1.1rem;">Still verify company details before applying.</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # ===== NEW: Share buttons =====
+                    st.markdown("### 📤 Share Result")
+                    if analysis['result'] == "FAKE":
+                        share_text = f"🚨 FAKE JOB ALERT! Fraud Probability: {analysis['score']:.1f}%"
+                    else:
+                        share_text = f"✅ Job seems genuine! Safety Score: {100-analysis['score']:.1f}%"
+                    
+                    whatsapp_link = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
+                    mailto_link = f"mailto:?subject=JobShield AI Result&body={urllib.parse.quote(share_text)}"
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.markdown(f'<a href="{whatsapp_link}" target="_blank" class="share-button">📱 WhatsApp</a>', unsafe_allow_html=True)
+                    with col2:
+                        st.markdown(f'<a href="#" onclick="navigator.clipboard.writeText(`{share_text}`);alert(\'Copied!\');" class="share-button">📋 Copy</a>', unsafe_allow_html=True)
+                    with col3:
+                        st.markdown(f'<a href="{mailto_link}" class="share-button">📧 Email</a>', unsafe_allow_html=True)
+                    
+                    # Auto Email (unchanged)
+                    with st.spinner("📧 Sending analysis report to your email..."):
+                        auto_sent = send_email_alert(
+                            to_email=st.session_state.user_email,
+                            user_name=st.session_state.user_name,
+                            job_text=job_text,
+                            result=analysis['result'],
+                            score=analysis['score'],
+                            suggestions=analysis['suggestions'],
+                            trigger_hits=analysis['trigger_hits'],
+                            detected_lang=analysis['detected_lang'],
+                            translated_text=analysis['translated_text'],
+                        )
+                    
+                    if auto_sent:
+                        st.markdown(f"""
+                        <div class="email-alert-premium">
+                            📧 Analysis report sent to <strong>{st.session_state.user_email}</strong>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.warning("⚠️ Auto email failed - check SMTP settings.")
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        
+                        st.markdown("#### 🌍 Language Analysis")
+                        
+                        lang_map = {
+                            'ta':'Tamil','hi':'Hindi','en':'English','ar':'Arabic','zh-cn':'Chinese',
+                            'es':'Spanish','fr':'French','de':'German','ja':'Japanese','ko':'Korean',
+                            'ru':'Russian','pt':'Portuguese','id':'Indonesian','tr':'Turkish',
+                            'bn':'Bengali','vi':'Vietnamese','th':'Thai','ur':'Urdu',
+                        }
+                        lang_display = lang_map.get(analysis['detected_lang'], analysis['detected_lang'].upper())
+                        
+                        st.info(f"**Detected Language:** {lang_display}")
+                        
+                        if analysis['detected_lang'] != 'en':
+                            st.markdown("#### 📝 English Translation")
+                            st.info(analysis['translated_text'][:400])
+                        
+                        if analysis['trigger_hits']:
+                            st.markdown("#### ⚠️ Risk Indicators")
+                            for hit in analysis['trigger_hits']:
+                                st.markdown(f'<span class="risk-badge-premium">{hit}</span>', unsafe_allow_html=True)
+                        else:
+                            st.success("✅ No major risk keywords found")
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    with col2:
+                         
+                        st.markdown("#### 💡 Recommendations")
+                        
+                        for s in analysis['suggestions']:
+                            st.markdown(f"- {s}")
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    heading = "### 🚨 Apply on These TRUSTED Platforms Instead!" if analysis['result'] == "FAKE" else "### 🏆 Top Trusted Job Platforms"
+                    st.markdown(heading)
+                    cols = st.columns(6)
+                    for i, site in enumerate(get_trusted_sites()):
+                        with cols[i]:
+                            st.markdown(f"""<div class="site-card">
+                                <img src="{site['logo']}" width="40" height="40" 
+                                     style="border-radius:8px;margin-bottom:8px;">
+                                <br>
+                                <a href="{site['url']}" target="_blank">{site['name']}</a>
+                            </div>""", unsafe_allow_html=True)
+                    
+        # ===== End Scanner UI =====
+    elif page == "📜 History":
+        show_history_page()
+    elif page == "📊 Analytics":
+        show_analytics_page()
 
-# ─────────────────────────────────────────────
-# ROUTER
-# ─────────────────────────────────────────────
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-
+# ==================== ROUTER (unchanged) ====================
 if st.session_state.logged_in:
     show_main_page()
 else:
@@ -1159,8 +1383,6 @@ else:
 # Premium Footer
 st.markdown("""
 <div class="footer-premium">
-    🛡️ JobShield AI v2.0 | ML + AI + 20+ Languages | Premium Security System
+    🛡️ JobShield AI v3.0 | ML + AI + 20+ Languages | Premium Security System
 </div>
 """, unsafe_allow_html=True)
-
-

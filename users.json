@@ -1,6 +1,6 @@
 {
   "project192003@gmail.com": {
-    "name":"Administrator"'
+    "name":"Administrator",
     "passord": "hashed_password",
     "email":"project192003",
     "role": "admin"
@@ -15,3 +15,4 @@
   }
 
 }
+

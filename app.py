@@ -17,7 +17,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from langdetect import detect
 
-# ==================== NEW: OCR SETUP ====================
+# ==================== OCR SETUP ====================
 try:
     import pytesseract
     from PIL import Image
@@ -26,14 +26,21 @@ try:
 except:
     OCR_AVAILABLE = False
 
-# ==================== NEW: MATPLOTLIB FOR ANALYTICS ====================
+# ==================== MATPLOTLIB FOR ANALYTICS ====================
 try:
     import matplotlib.pyplot as plt
     MATPLOTLIB_AVAILABLE = True
 except:
     MATPLOTLIB_AVAILABLE = False
 
-# ==================== CONFIGURATION (unchanged) ====================
+# ==================== PDF REPORT GENERATION ====================
+try:
+    from fpdf import FPDF
+    PDF_AVAILABLE = True
+except:
+    PDF_AVAILABLE = False
+
+# ==================== CONFIGURATION ====================
 SENDER_EMAIL = "project192003@gmail.com"
 SENDER_PASSWORD = "zppgvmmtergdvzgs"
 ADMIN_EMAIL = "project192003@gmail.com"
@@ -55,18 +62,17 @@ st.set_page_config(
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
-    
 )
 
-# ==================== NEW: SESSION STATE FOR HISTORY ====================
+# ==================== SESSION STATE ====================
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'history' not in st.session_state:
-    st.session_state.history = []  # for scan history
+    st.session_state.history = []
 if 'sound_enabled' not in st.session_state:
     st.session_state.sound_enabled = True
 
-# ==================== PREMIUM CSS (Light Purple Background) ====================
+# ==================== PREMIUM CSS ====================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -406,8 +412,6 @@ st.markdown("""
         margin-top: 0 !important;
     }
 
-    
-    
     hr {
         border: none;
         height: 2px;
@@ -476,7 +480,7 @@ st.markdown("""
         50% { transform: translateY(-5px); }
     }
     
-    /* ===== Share button styles ===== */
+    /* Share button styles */
     .share-button {
         background: linear-gradient(135deg, #8b5cf6, #a855f7);
         color: white !important;
@@ -498,7 +502,7 @@ st.markdown("""
         box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
     }
     
-    /* ===== Light Purple File Uploader ===== */
+    /* Light Purple File Uploader */
     div[data-testid="stFileUploader"] {
         background: #f3e8ff !important;
         border: 2px dashed #8b5cf6 !important;
@@ -514,7 +518,7 @@ st.markdown("""
         color: #4a1d6d !important;
     }
     
-    /* ===== Site Card for Trusted Sites ===== */
+    /* Site Card for Trusted Sites */
     .site-card {
         background: rgba(255, 255, 255, 0.15);
         backdrop-filter: blur(5px);
@@ -561,7 +565,7 @@ def clean_ocr_text(text):
     lines = [line.strip() for line in cleaned.split('\n') if line.strip()]
     return '\n'.join(lines)
 
-# ==================== ADMIN ALERT FUNCTION (unchanged) ====================
+# ==================== ADMIN ALERT FUNCTION ====================
 def send_admin_alert(user_email, user_name, action="login"):
     try:
         msg = MIMEMultipart('alternative')
@@ -615,7 +619,48 @@ def send_admin_alert(user_email, user_name, action="login"):
         print(f"Admin alert failed: {e}")
         return False
 
-# ==================== USER MANAGEMENT (unchanged) ====================
+# ==================== USER ACTIVITY LOGGING ====================
+def log_user_activity(user_email, user_name, action, details=None):
+    """Log user activity for admin monitoring"""
+    try:
+        log_file = "user_activity.json"
+        if os.path.exists(log_file):
+            with open(log_file, 'r') as f:
+                logs = json.load(f)
+        else:
+            logs = []
+        
+        logs.append({
+            'timestamp': datetime.now().isoformat(),
+            'user_email': user_email,
+            'user_name': user_name,
+            'action': action,
+            'details': details
+        })
+        
+        # Keep only last 500 logs
+        if len(logs) > 500:
+            logs = logs[-500:]
+        
+        with open(log_file, 'w') as f:
+            json.dump(logs, f, indent=4)
+        return True
+    except Exception as e:
+        print(f"Log error: {e}")
+        return False
+
+def get_user_activity_logs():
+    """Get user activity logs"""
+    try:
+        log_file = "user_activity.json"
+        if os.path.exists(log_file):
+            with open(log_file, 'r') as f:
+                return json.load(f)
+        return []
+    except:
+        return []
+
+# ==================== USER MANAGEMENT ====================
 def load_users():
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, 'r') as f:
@@ -635,6 +680,8 @@ def register_user(name, email, password):
         return False, "Email already registered!"
     users[email] = {"name": name, "password": hash_password(password), "email": email}
     save_users(users)
+    # Log registration
+    log_user_activity(email, name, "registered")
     return True, "Registration successful!"
 
 def login_user(email, password):
@@ -643,9 +690,11 @@ def login_user(email, password):
         return False, "Email not found!"
     if users[email]['password'] != hash_password(password):
         return False, "Wrong password!"
+    # Log login
+    log_user_activity(email, users[email]['name'], "login")
     return True, users[email]['name']
 
-# ==================== ENHANCED EMAIL FUNCTION (unchanged) ====================
+# ==================== ENHANCED EMAIL FUNCTION ====================
 def send_email_alert(to_email, user_name, job_text, result, score, suggestions,
                      trigger_hits, detected_lang="en", translated_text=""):
     try:
@@ -746,7 +795,7 @@ def send_email_alert(to_email, user_name, job_text, result, score, suggestions,
     except Exception:
         return False
 
-# ==================== MODEL TRAINING (unchanged) ====================
+# ==================== MODEL TRAINING ====================
 @st.cache_resource
 def train_model():
     try:
@@ -799,7 +848,7 @@ def train_model():
 
 model, vectorizer = train_model()
 
-# ==================== TRANSLATION FUNCTION (unchanged) ====================
+# ==================== TRANSLATION FUNCTION ====================
 def translate_to_english(text):
     try:
         detected_lang = detect(text)
@@ -818,7 +867,8 @@ def translate_to_english(text):
             pass
     return text, detected_lang
 
-# ==================== JOB ANALYSIS FUNCTION (unchanged) ====================
+
+# ==================== JOB ANALYSIS FUNCTION ====================
 def analyze_job(job_text):
     if not job_text or model is None:
         return None
@@ -902,8 +952,7 @@ def analyze_job(job_text):
         }
     except Exception:
         return None
-
-# ==================== TRUSTED SITES (unchanged) ====================
+# ==================== TRUSTED SITES ====================
 def get_trusted_sites():
     return [
         {'name': 'LinkedIn',  'url': 'https://www.linkedin.com/jobs', 'logo': 'https://www.google.com/s2/favicons?domain=linkedin.com&sz=64'},
@@ -914,7 +963,7 @@ def get_trusted_sites():
         {'name': 'Shine',     'url': 'https://www.shine.com',         'logo': 'https://www.google.com/s2/favicons?domain=shine.com&sz=64'},
     ]
 
-# ==================== NEW: OCR FUNCTION ====================
+# ==================== OCR FUNCTION ====================
 def extract_text_from_image(uploaded_file):
     if not OCR_AVAILABLE:
         return None, "Tesseract OCR not installed. Please install from https://github.com/UB-Mannheim/tesseract/wiki"
@@ -925,7 +974,216 @@ def extract_text_from_image(uploaded_file):
     except Exception as e:
         return None, str(e)
 
-# ==================== NEW: PAGE FUNCTIONS ====================
+# ==================== FIXED ANALYTICS PAGE ====================
+def show_analytics_page():
+    st.markdown("## 📊 Analytics Dashboard")
+    history = st.session_state.history
+    if not history:
+        st.info("No data yet. Start scanning jobs!")
+        return
+    
+    total = len(history)
+    fake = sum(1 for h in history if h['result'] == 'FAKE')
+    real = total - fake
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,#8b5cf6,#a855f7); padding:1.5rem; border-radius:15px; text-align:center;">
+            <h3 style="color:white; margin:0;">📊 Total</h3>
+            <h2 style="color:white; margin:0;">{total}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,#ff416c,#ff4b2b); padding:1.5rem; border-radius:15px; text-align:center;">
+            <h3 style="color:white; margin:0;">⚠️ Fake</h3>
+            <h2 style="color:white; margin:0;">{fake}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    with col3:
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,#11998e,#38ef7d); padding:1.5rem; border-radius:15px; text-align:center;">
+            <h3 style="color:white; margin:0;">✅ Safe</h3>
+            <h2 style="color:white; margin:0;">{real}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Fixed Pie Chart
+    if MATPLOTLIB_AVAILABLE and total > 0:
+        fig, ax = plt.subplots(figsize=(6,4))
+        colors = ['#ff6b6b', '#51cf66']
+        wedges, texts, autotexts = ax.pie([fake, real], 
+                                           labels=['Fake Jobs', 'Safe Jobs'],
+                                           autopct='%1.1f%%',
+                                           colors=colors,
+                                           startangle=90,
+                                           textprops={'color': 'white', 'weight': 'bold'})
+        for text in texts + autotexts:
+            text.set_color('white')
+        ax.set_facecolor('#1e1e3f')
+        fig.patch.set_facecolor('#1e1e3f')
+        st.pyplot(fig)
+    else:
+        st.info("Install matplotlib to see charts or scan more jobs.")
+
+# ==================== NEW USER PROFILE PAGE ====================
+def show_profile_page():
+    st.markdown("""
+    <div style="text-align:center; margin-bottom:2rem;">
+        <h1 style="background:linear-gradient(90deg,#8b5cf6,#a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">👤 My Profile</h1>
+        <p style="color:#6b21a5;">Premium Security System</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    users = load_users()
+    user_data = users.get(st.session_state.user_email, {})
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,#6a0dad,#8a2be2); border-radius:20px; padding:2rem; text-align:center;">
+            <div style="font-size:5rem; margin-bottom:1rem;">👤</div>
+            <h2 style="color:white; margin:0;">{user_data.get('name', '')}</h2>
+            <p style="color:rgba(255,255,255,0.8);">{user_data.get('email', '')}</p>
+            <div style="background:rgba(255,215,0,0.2); border:1px solid gold; border-radius:20px; padding:0.3rem 1rem; display:inline-block; margin-top:1rem;">
+                <p style="color:gold; margin:0;">🔒 {'Admin' if st.session_state.user_email == 'project192003@gmail.com' else 'Premium'} User</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div style="background:rgba(255,255,255,0.1); backdrop-filter:blur(10px); border-radius:20px; padding:2rem;">
+            <h3 style="color:#8b5cf6;">📋 Personal Information</h3>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <p style="color:#1e1e3f;"><strong>Username:</strong> {user_data.get('name', '')}</p>
+        <p style="color:#1e1e3f;"><strong>Email:</strong> {user_data.get('email', '')}</p>
+        <p style="color:#1e1e3f;"><strong>Member Since:</strong> {datetime.now().strftime('%Y-%m-%d')}</p>
+        
+        <h3 style="color:#8b5cf6; margin-top:2rem;">📊 Activity Stats</h3>
+        
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-top:1rem;">
+            <div style="background:rgba(139,92,246,0.1); border-radius:10px; padding:1rem; text-align:center;">
+                <h2 style="color:#8b5cf6; margin:0;">{len(st.session_state.history)}</h2>
+                <p style="color:#1e1e3f; margin:0;">Total Scans</p>
+            </div>
+            <div style="background:rgba(139,92,246,0.1); border-radius:10px; padding:1rem; text-align:center;">
+                <h2 style="color:#8b5cf6; margin:0;">{sum(1 for h in st.session_state.history if h['result'] == 'FAKE')}</h2>
+                <p style="color:#1e1e3f; margin:0;">Threats Found</p>
+            </div>
+            <div style="background:rgba(139,92,246,0.1); border-radius:10px; padding:1rem; text-align:center;">
+                <h2 style="color:#8b5cf6; margin:0;">{len(st.session_state.history) - sum(1 for h in st.session_state.history if h['result'] == 'FAKE')}</h2>
+                <p style="color:#1e1e3f; margin:0;">Safe Jobs</p>
+            </div>
+        </div>
+        
+        <h3 style="color:#8b5cf6; margin-top:2rem;">⚙️ Account Settings</h3>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🔑 Change Password", use_container_width=True):
+            st.info("Password change feature coming soon!")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# ==================== NEW ADMIN PANEL ====================
+def show_admin_page():
+    st.markdown("""
+    <div style="text-align:center; margin-bottom:2rem;">
+        <h1 style="background:linear-gradient(90deg,#8b5cf6,#a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">👑 Admin Panel</h1>
+        <p style="color:#6b21a5;">Premium Security System</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.session_state.user_email != "project192003@gmail.com":
+        st.error("⛔ Access Denied! Admin only.")
+        return
+    
+    tab1, tab2, tab3 = st.tabs(["📊 Overview", "👥 Users", "📋 Activity"])
+    
+    with tab1:
+        users = load_users()
+        total_users = len(users)
+        total_scans = len(st.session_state.history)
+        fake_scans = sum(1 for h in st.session_state.history if h['result'] == 'FAKE')
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,#6a0dad,#8a2be2); border-radius:15px; padding:1.5rem; text-align:center;">
+                <h3 style="color:white; margin:0;">👥 Users</h3>
+                <h2 style="color:white; margin:0;">{total_users}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,#6a0dad,#8a2be2); border-radius:15px; padding:1.5rem; text-align:center;">
+                <h3 style="color:white; margin:0;">📊 Scans</h3>
+                <h2 style="color:white; margin:0;">{total_scans}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        with col3:
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,#ff416c,#ff4b2b); border-radius:15px; padding:1.5rem; text-align:center;">
+                <h3 style="color:white; margin:0;">⚠️ Threats</h3>
+                <h2 style="color:white; margin:0;">{fake_scans}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        with col4:
+            safe = total_scans - fake_scans
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,#11998e,#38ef7d); border-radius:15px; padding:1.5rem; text-align:center;">
+                <h3 style="color:white; margin:0;">✅ Safe</h3>
+                <h2 style="color:white; margin:0;">{safe}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    with tab2:
+        st.markdown("### 👥 User Management")
+        users = load_users()
+        user_data = []
+        for email, data in users.items():
+            user_data.append({
+                "Username": data['name'],
+                "Email": email,
+                "Role": "👑 Admin" if email == "project192003@gmail.com" else "👤 User"
+            })
+        if user_data:
+            df = pd.DataFrame(user_data)
+            st.dataframe(df, use_container_width=True)
+    
+    with tab3:
+        st.markdown("### 📋 User Activity Log")
+        st.markdown("See who logged in when and what they scanned")
+        
+        try:
+            if os.path.exists("user_activity.json"):
+                with open("user_activity.json", 'r') as f:
+                    logs = json.load(f)
+                if logs:
+                    df_logs = pd.DataFrame(logs)
+                    display_df = df_logs[['timestamp', 'user_name', 'action', 'details']]
+                    display_df.columns = ['Time', 'User', 'Action', 'Details']
+                    st.dataframe(display_df, use_container_width=True)
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Total Logins", len(df_logs[df_logs['action'] == 'login']))
+                    with col2:
+                        st.metric("Total Scans", len(df_logs[df_logs['action'] == 'scanned a job']))
+                    with col3:
+                        st.metric("Registrations", len(df_logs[df_logs['action'] == 'registered']))
+                else:
+                    st.info("No activity logs yet")
+            else:
+                st.info("No activity logs yet")
+        except:
+            st.info("No activity logs yet")
+
+# ==================== HISTORY PAGE ====================
 def show_history_page():
     st.markdown("## 📜 Scan History")
     if not st.session_state.history:
@@ -939,31 +1197,7 @@ def show_history_page():
         st.session_state.history = []
         st.rerun()
 
-def show_analytics_page():
-    st.markdown("## 📊 Analytics")
-    history = st.session_state.history
-    if not history:
-        st.info("No data yet.")
-        return
-    
-    total = len(history)
-    fake = sum(1 for h in history if h['result'] == 'FAKE')
-    real = total - fake
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Scans", total)
-    col2.metric("Fake Jobs", fake, delta=fake, delta_color="inverse")
-    col3.metric("Safe Jobs", real)
-    
-    # Simple pie chart
-    if MATPLOTLIB_AVAILABLE:
-        fig, ax = plt.subplots()
-        ax.pie([fake, real], labels=['Fake', 'Safe'], autopct='%1.1f%%', colors=['#ff6b6b','#51cf66'])
-        st.pyplot(fig)
-    else:
-        st.write("Install matplotlib to see charts.")
-
-# ==================== AUTH PAGE (Updated - Single Box with Login & Register) ====================
+# ==================== AUTH PAGE ====================
 def show_auth_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     
@@ -974,9 +1208,6 @@ def show_auth_page():
             <p class="hero-sub-premium">Premium Fake Job Detection System</p>
         </div>
         """, unsafe_allow_html=True)
-        
-        # Single Glass Card with both Login and Register
-        
         
         # Tabs inside the same box
         tab1, tab2 = st.tabs(["🔐 LOGIN", "📝 REGISTER"])
@@ -1027,8 +1258,6 @@ def show_auth_page():
                 else:
                     st.warning("⚠️ Fill all fields!")
         
-        st.markdown('</div>', unsafe_allow_html=True)
-        
         # Stats below the box
         col_a, col_b, col_c = st.columns(3)
         with col_a:
@@ -1053,7 +1282,7 @@ def show_auth_page():
             </div>
             """, unsafe_allow_html=True)
 
-# ==================== MAIN PAGE (modified to add navigation) ====================
+# ==================== MAIN PAGE ====================
 def show_main_page():
     # Admin Alert Badge
     st.markdown("""
@@ -1062,7 +1291,7 @@ def show_main_page():
     </div>
     """, unsafe_allow_html=True)
     
-    # Premium Sidebar (modified with navigation)
+    # Premium Sidebar
     with st.sidebar:
         st.markdown("""
         <div style="text-align:center; padding:1rem;">
@@ -1080,12 +1309,15 @@ def show_main_page():
         
         st.markdown("---")
         
-        # Navigation
-        page = st.radio("Navigation", ["🔍 Scanner", "📜 History", "📊 Analytics"])
+        # Navigation with Admin and Profile options
+        nav_options = ["🔍 Scanner", "📜 History", "📊 Analytics", "👤 Profile"]
+        if st.session_state.user_email == "project192003@gmail.com":
+            nav_options.append("👑 Admin")
+        page = st.radio("Navigation", nav_options)
         
         st.markdown("---")
         
-        # Quick Stats (unchanged)
+        # Quick Stats
         st.markdown("### 📊 Quick Stats")
         col1, col2 = st.columns(2)
         with col1:
@@ -1111,7 +1343,7 @@ def show_main_page():
     
     # Page routing
     if page == "🔍 Scanner":
-        # ===== Main Scanner UI (mostly unchanged, but replace email with image upload) =====
+        # Scanner UI
         st.markdown("""
         <div class="hero-premium">
             <h1 class="hero-title-premium">🔍 Job Fraud Detector</h1>
@@ -1119,9 +1351,6 @@ def show_main_page():
         </div>
         """, unsafe_allow_html=True)
         
-        
-        
-        # REPLACED: Email Content → Image Upload
         input_method = st.radio(
             "Choose input method:",
             ["📝 Paste Text", "🔗 Job URL", "📸 Image Upload"],
@@ -1155,7 +1384,7 @@ def show_main_page():
                     'weworkremotely.com', 'flexjobs.com', 'virtualvocations.com', 'jobspresso.co',
                     
                     # Indian MNCs & Tech Companies
-                    'tcs.com', 'infosys.com', 'wipro.com', 'hcl.com', 'techmahindra.com',
+                    'tcs.com', 'infosys.com', 'wipro.com', 'hcltech.com', 'techmahindra.com',
                     'lti.com', 'mindtree.com', 'cognizant.com', 'capgemini.com', 'accenture.com',
                     'ibm.com', 'microsoft.com', 'google.co.in', 'amazon.in', 'flipkart.com',
                     'paytm.com', 'phonepe.com', 'razorpay.com', 'zomato.com', 'swiggy.com',
@@ -1228,7 +1457,6 @@ def show_main_page():
                         st.error(f"❌ {error}")
                         job_text = ""
         
-        st.markdown('</div>', unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             analyze_clicked = st.button("🔍 ANALYZE JOB - DETECT FRAUD", use_container_width=True)
@@ -1245,7 +1473,7 @@ def show_main_page():
                 if not analysis:
                     st.error("❌ Analysis failed. Please try again.")
                 else:
-                    # Save to history (NEW)
+                    # Save to history
                     history_entry = {
                         'timestamp': datetime.now().isoformat(),
                         'job_text': job_text[:100],
@@ -1254,6 +1482,14 @@ def show_main_page():
                         'language': analysis['detected_lang']
                     }
                     st.session_state.history.append(history_entry)
+                    
+                    # Log scan activity
+                    log_user_activity(
+                        st.session_state.user_email,
+                        st.session_state.user_name,
+                        "scanned a job",
+                        f"Result: {analysis['result']} | Score: {analysis['score']:.1f}% | Language: {analysis['detected_lang']}"
+                    )
                     
                     st.markdown("---")
                     
@@ -1274,7 +1510,7 @@ def show_main_page():
                         </div>
                         """, unsafe_allow_html=True)
                     
-                    # ===== NEW: Share buttons =====
+                    # Share buttons with PDF download
                     st.markdown("### 📤 Share Result")
                     if analysis['result'] == "FAKE":
                         share_text = f"🚨 FAKE JOB ALERT! Fraud Probability: {analysis['score']:.1f}%"
@@ -1284,15 +1520,35 @@ def show_main_page():
                     whatsapp_link = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
                     mailto_link = f"mailto:?subject=JobShield AI Result&body={urllib.parse.quote(share_text)}"
                     
-                    col1, col2, col3 = st.columns(3)
+                    col1, col2, col3, col4 = st.columns(4)
                     with col1:
                         st.markdown(f'<a href="{whatsapp_link}" target="_blank" class="share-button">📱 WhatsApp</a>', unsafe_allow_html=True)
                     with col2:
                         st.markdown(f'<a href="#" onclick="navigator.clipboard.writeText(`{share_text}`);alert(\'Copied!\');" class="share-button">📋 Copy</a>', unsafe_allow_html=True)
                     with col3:
                         st.markdown(f'<a href="{mailto_link}" class="share-button">📧 Email</a>', unsafe_allow_html=True)
+                    with col4:
+                        # PDF Download
+                        try:
+                            from fpdf import FPDF
+                            pdf = FPDF()
+                            pdf.add_page()
+                            pdf.set_font('Arial', 'B', 16)
+                            pdf.cell(0, 10, 'JobShield AI Report', 0, 1, 'C')
+                            pdf.set_font('Arial', '', 12)
+                            pdf.cell(0, 10, f'User: {st.session_state.user_name}', 0, 1)
+                            pdf.cell(0, 10, f'Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', 0, 1)
+                            pdf.cell(0, 10, f'Result: {analysis["result"]}', 0, 1)
+                            pdf.cell(0, 10, f'Score: {analysis["score"]:.1f}%', 0, 1)
+                            
+                            pdf_output = pdf.output(dest='S').encode('latin1')
+                            b64 = base64.b64encode(pdf_output).decode()
+                            href = f'<a href="data:application/pdf;base64,{b64}" download="jobshield_report.pdf" class="share-button">📥 PDF</a>'
+                            st.markdown(href, unsafe_allow_html=True)
+                        except:
+                            st.markdown('<div class="share-button" style="opacity:0.5;">📥 PDF</div>', unsafe_allow_html=True)
                     
-                    # Auto Email (unchanged)
+                    # Auto Email
                     with st.spinner("📧 Sending analysis report to your email..."):
                         auto_sent = send_email_alert(
                             to_email=st.session_state.user_email,
@@ -1368,13 +1624,16 @@ def show_main_page():
                                 <a href="{site['url']}" target="_blank">{site['name']}</a>
                             </div>""", unsafe_allow_html=True)
                     
-        # ===== End Scanner UI =====
     elif page == "📜 History":
         show_history_page()
     elif page == "📊 Analytics":
         show_analytics_page()
+    elif page == "👤 Profile":
+        show_profile_page()
+    elif page == "👑 Admin":
+        show_admin_page()
 
-# ==================== ROUTER (unchanged) ====================
+# ==================== ROUTER ====================
 if st.session_state.logged_in:
     show_main_page()
 else:

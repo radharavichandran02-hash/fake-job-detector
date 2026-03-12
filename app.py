@@ -11,8 +11,6 @@ import base64
 import textwrap
 from datetime import datetime, timedelta
 import time
-import plotly.graph_objects as go
-import plotly.express as px
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from deep_translator import GoogleTranslator, MyMemoryTranslator
@@ -22,6 +20,15 @@ from sklearn.model_selection import train_test_split
 from langdetect import detect
 import warnings
 warnings.filterwarnings('ignore')
+
+# Plotly with fallback
+try:
+    import plotly.graph_objects as go
+    import plotly.express as px
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+    print("Plotly not available - using fallback")
 
 # ==================== OCR SETUP ====================
 try:
@@ -47,7 +54,7 @@ def generate_detailed_pdf_report(analysis, job_text, user_name, timestamp):
 # ==================== CONFIGURATION ====================
 SENDER_EMAIL = "project192003@gmail.com"
 SENDER_PASSWORD = "zppgvmmtergdvzgs"
-ADMIN_EMAIL = "project192003@gmail.com"  # This is the admin email
+ADMIN_EMAIL = "project192003@gmail.com"
 USERS_FILE = "users.json"
 HISTORY_FILE = "scan_history.json"
 ACTIVITY_FILE = "user_activity.json"
@@ -74,7 +81,6 @@ st.set_page_config(
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'history' not in st.session_state:
-    # Load history from file if exists
     if os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE, 'r') as f:
             st.session_state.history = json.load(f)
@@ -97,7 +103,6 @@ st.markdown("""
     
     * { font-family: 'Inter', sans-serif !important; }
     
-    /* Light Purple Background */
     .stApp {
         background: linear-gradient(145deg, #f3e8ff, #e9d9ff, #f3e8ff);
         background-size: 400% 400%;
@@ -148,7 +153,6 @@ st.markdown("""
         animation: fadeInUp 1s ease 0.3s both;
     }
     
-    /* Glass Card - Login/Register Box */
     .glass-card-premium {
         background: rgba(255, 255, 255, 0.25);
         backdrop-filter: blur(12px);
@@ -497,7 +501,6 @@ st.markdown("""
         50% { transform: translateY(-5px); }
     }
     
-    /* Share button styles */
     .share-button {
         background: linear-gradient(135deg, #8b5cf6, #a855f7);
         color: white !important;
@@ -520,7 +523,6 @@ st.markdown("""
         box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
     }
     
-    /* Light Purple File Uploader */
     div[data-testid="stFileUploader"] {
         background: #f3e8ff !important;
         border: 2px dashed #8b5cf6 !important;
@@ -536,7 +538,6 @@ st.markdown("""
         color: #4a1d6d !important;
     }
     
-    /* Site Card for Trusted Sites */
     .site-card {
         background: rgba(255, 255, 255, 0.15);
         backdrop-filter: blur(5px);
@@ -568,19 +569,16 @@ st.markdown("""
 
 # ==================== FILE OPERATIONS ====================
 def save_history():
-    """Save scan history to file"""
     with open(HISTORY_FILE, 'w') as f:
         json.dump(st.session_state.history, f, indent=4)
 
 def load_history():
-    """Load scan history from file"""
     if os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE, 'r') as f:
             st.session_state.history = json.load(f)
 
 # ==================== OCR CLEANING FUNCTION ====================
 def clean_ocr_text(text):
-    """Remove common OCR artifacts like keyboard_arrowright, arrows, etc."""
     artifacts = [
         'keyboard_arrowright', 'keyboard_arrowleft', 'arrow_forward',
         'arrow_back', 'arrow_upward', 'arrow_downward', 'chevron_right',
@@ -591,7 +589,6 @@ def clean_ocr_text(text):
     cleaned = text
     for artifact in artifacts:
         cleaned = cleaned.replace(artifact, '')
-    # Remove extra blank lines
     lines = [line.strip() for line in cleaned.split('\n') if line.strip()]
     return '\n'.join(lines)
 
@@ -602,9 +599,7 @@ def send_admin_alert(user_email, user_name, action="login"):
         msg['Subject'] = f"👤 User {action.capitalize()} Alert - JobShield AI"
         msg['From'] = SENDER_EMAIL
         msg['To'] = ADMIN_EMAIL
-        
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
         html = f"""
         <!DOCTYPE html>
         <html>
@@ -637,9 +632,7 @@ def send_admin_alert(user_email, user_name, action="login"):
         </body>
         </html>
         """
-        
         msg.attach(MIMEText(html, 'html'))
-        
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
         server.sendmail(SENDER_EMAIL, ADMIN_EMAIL, msg.as_string())
@@ -651,14 +644,12 @@ def send_admin_alert(user_email, user_name, action="login"):
 
 # ==================== USER ACTIVITY LOGGING ====================
 def log_user_activity(user_email, user_name, action, details=None):
-    """Log user activity for admin monitoring"""
     try:
         if os.path.exists(ACTIVITY_FILE):
             with open(ACTIVITY_FILE, 'r') as f:
                 logs = json.load(f)
         else:
             logs = []
-        
         logs.append({
             'timestamp': datetime.now().isoformat(),
             'user_email': user_email,
@@ -666,11 +657,8 @@ def log_user_activity(user_email, user_name, action, details=None):
             'action': action,
             'details': details
         })
-        
-        # Keep only last 1000 logs
         if len(logs) > 1000:
             logs = logs[-1000:]
-        
         with open(ACTIVITY_FILE, 'w') as f:
             json.dump(logs, f, indent=4)
         return True
@@ -679,7 +667,6 @@ def log_user_activity(user_email, user_name, action, details=None):
         return False
 
 def get_user_activity_logs():
-    """Get user activity logs"""
     try:
         if os.path.exists(ACTIVITY_FILE):
             with open(ACTIVITY_FILE, 'r') as f:
@@ -726,14 +713,9 @@ def login_user(email, password):
         return False, "Email not found!", False
     if users[email]['password'] != hash_password(password):
         return False, "Wrong password!", False
-    
-    # Update last login
     users[email]['last_login'] = datetime.now().isoformat()
     save_users(users)
-    
-    # Log login
     log_user_activity(email, users[email]['name'], "login")
-    
     return True, users[email]['name'], users[email].get('is_admin', False)
 
 def update_user_scans(email):
@@ -750,7 +732,6 @@ def send_email_alert(to_email, user_name, job_text, result, score, suggestions,
         msg['Subject'] = f"🛡️ JobShield AI - {'⚠️ FAKE JOB DETECTED' if result == 'FAKE' else '✅ Genuine Job Verified'}"
         msg['From'] = SENDER_EMAIL
         msg['To'] = to_email
-        
         is_fake = (result == "FAKE")
         banner_grad = "linear-gradient(135deg,#ff416c,#ff4b2b)" if is_fake else "linear-gradient(135deg,#11998e,#38ef7d)"
         status_label = "⚠️ FAKE JOB DETECTED" if is_fake else "✅ LIKELY GENUINE JOB"
@@ -834,7 +815,6 @@ def send_email_alert(to_email, user_name, job_text, result, score, suggestions,
         </html>"""
         
         msg.attach(MIMEText(html, 'html'))
-        
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
         server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
@@ -851,7 +831,6 @@ def train_model():
             df = pd.read_excel(DATASET_PATH, engine='openpyxl')
         except Exception:
             df = None
-            
         if df is None or df.shape[0] < 10:
             for enc in ['utf-8', 'latin1', 'cp1252']:
                 try:
@@ -860,44 +839,33 @@ def train_model():
                         break
                 except Exception:
                     continue
-        
         text_cols = [c for c in ['description','company_profile','requirements','benefits','title'] if c in df.columns]
         if not text_cols:
             return None, None, 0
-            
         df['_text'] = df[text_cols].fillna('').astype(str).agg(' '.join, axis=1).str.strip()
         df = df[df['_text'].str.len() > 10]
-        
         label_col = next((c for c in ['fraudulent','label','fake','fraud'] if c in df.columns), df.columns[-1])
         df = df[['_text', label_col]].copy()
         df.columns = ['description', 'fraudulent']
-        
         df['fraudulent'] = df['fraudulent'].astype(str).str.lower().str.strip()
         df['fraudulent'] = df['fraudulent'].replace(
             {'fake':1,'real':0,'genuine':0,'1':1,'0':0,'1.0':1,'0.0':0,'true':1,'false':0}
         )
         df = df[df['fraudulent'].isin([0,1])].dropna()
         df['fraudulent'] = df['fraudulent'].astype(int)
-        
         fake = df[df['fraudulent']==1]
         real = df[df['fraudulent']==0]
         n = min(len(fake), len(real))
         df_bal = pd.concat([fake.sample(n, random_state=42), real.sample(n, random_state=42)])
-        
         vec = TfidfVectorizer(stop_words='english', max_features=5000, min_df=1)
         X = vec.fit_transform(df_bal['description'].astype(str))
         y = df_bal['fraudulent']
-        
-        # Train model
         model = LogisticRegression(max_iter=1000)
         model.fit(X, y)
-        
-        # Calculate accuracy
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         model_acc = LogisticRegression(max_iter=1000)
         model_acc.fit(X_train, y_train)
         accuracy = model_acc.score(X_test, y_test)
-        
         return model, vec, accuracy
     except Exception as e:
         print(f"Model training error: {e}")
@@ -907,45 +875,34 @@ model, vectorizer, model_accuracy = train_model()
 
 # ==================== RETRAIN MODEL FUNCTION ====================
 def retrain_model():
-    """Retrain the model with current dataset"""
     global model, vectorizer, model_accuracy
-    
     try:
         df = pd.read_csv(DATASET_PATH, encoding='utf-8')
         text_cols = [c for c in ['description','company_profile','requirements','benefits','title'] if c in df.columns]
         if not text_cols:
             return None, None, 0
-            
         df['_text'] = df[text_cols].fillna('').astype(str).agg(' '.join, axis=1).str.strip()
         df = df[df['_text'].str.len() > 10]
-        
         label_col = next((c for c in ['fraudulent','label','fake','fraud'] if c in df.columns), df.columns[-1])
         df = df[['_text', label_col]].copy()
         df.columns = ['description', 'fraudulent']
-        
         df['fraudulent'] = df['fraudulent'].astype(str).str.lower().str.strip()
         df['fraudulent'] = df['fraudulent'].replace(
             {'fake':1,'real':0,'genuine':0,'1':1,'0':0,'1.0':1,'0.0':0,'true':1,'false':0}
         )
         df = df[df['fraudulent'].isin([0,1])].dropna()
         df['fraudulent'] = df['fraudulent'].astype(int)
-        
         fake = df[df['fraudulent']==1]
         real = df[df['fraudulent']==0]
         n = min(len(fake), len(real))
         df_bal = pd.concat([fake.sample(n, random_state=42), real.sample(n, random_state=42)])
-        
         vec = TfidfVectorizer(stop_words='english', max_features=5000, min_df=1)
         X = vec.fit_transform(df_bal['description'].astype(str))
         y = df_bal['fraudulent']
-        
         new_model = LogisticRegression(max_iter=1000)
         new_model.fit(X, y)
-        
-        # Calculate accuracy
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         accuracy = new_model.score(X_test, y_test)
-        
         return new_model, vec, accuracy
     except Exception as e:
         print(f"Retraining error: {e}")
@@ -957,10 +914,8 @@ def translate_to_english(text):
         detected_lang = detect(text)
     except Exception:
         detected_lang = "unknown"
-        
     if detected_lang == 'en':
         return text, 'en'
-        
     for Translator in [GoogleTranslator, MyMemoryTranslator]:
         try:
             r = Translator(source='auto', target='en').translate(text)
@@ -974,7 +929,6 @@ def translate_to_english(text):
 def analyze_job(job_text):
     if not job_text or model is None:
         return None
-        
     try:
         translated, detected_lang = translate_to_english(job_text)
         
@@ -1024,36 +978,27 @@ def analyze_job(job_text):
         for pattern, display in trigger_keywords.items():
             if pattern in text_lower:
                 trigger_hits.append(display)
-        
         trigger_hits = list(set(trigger_hits))[:8]
         
         X = vectorizer.transform([translated])
         proba = model.predict_proba(X)[0]
         score = proba[1] * 100
         
-        # ========== IMPROVED CLASSIFICATION ==========
-        # Trusted keywords for genuine jobs
         trusted_keywords = [
             'official', 'career', 'company website', 'linkedin', 'naukri',
             'indeed', 'glassdoor', 'आधिकारिक', 'करियर', 'वेबसाइट'
         ]
-        
-        # Check for trusted indicators
         trusted_hits = any(k in translated.lower() for k in trusted_keywords)
         
-        # Language-based threshold
         if detected_lang != 'en':
-            # Non-English jobs need higher confidence
             threshold = 65
         else:
             threshold = 50
         
-        # Override for trusted indicators
         if trusted_hits and detected_lang != 'en' and score < 65:
             result = "REAL"
         else:
             result = "FAKE" if score >= threshold else "REAL"
-        # =============================================
         
         suggestions = [
             "📋 Verify company on LinkedIn and Glassdoor",
@@ -1078,6 +1023,7 @@ def analyze_job(job_text):
     except Exception as e:
         print(f"Analysis error: {e}")
         return None
+
 # ==================== TRUSTED SITES ====================
 def get_trusted_sites():
     return [
@@ -1100,22 +1046,16 @@ def extract_text_from_image(uploaded_file):
     except Exception as e:
         return None, str(e)
 
-# ==================== USER ANALYTICS PAGE (with Timeline) ====================
+# ==================== USER ANALYTICS PAGE ====================
 def show_analytics_page():
     st.markdown("## 📊 Analytics Dashboard")
-    
-    # Get user's personal history
     user_history = [h for h in st.session_state.history if h.get('user_email') == st.session_state.user_email]
-    
     if not user_history:
         st.info("No data yet. Start scanning jobs to see analytics!")
         return
-    
-    # Overview metrics
     total = len(user_history)
     fake = sum(1 for h in user_history if h['result'] == 'FAKE')
     real = total - fake
-    
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f"""
@@ -1138,8 +1078,6 @@ def show_analytics_page():
             <h2 style="color:white; margin:0;">{real}</h2>
         </div>
         """, unsafe_allow_html=True)
-    
-    # Results pie chart
     if MATPLOTLIB_AVAILABLE and total > 0:
         fig, ax = plt.subplots(figsize=(6,4))
         colors = ['#ff6b6b', '#51cf66']
@@ -1154,23 +1092,15 @@ def show_analytics_page():
         ax.set_facecolor('#1e1e3f')
         fig.patch.set_facecolor('#1e1e3f')
         st.pyplot(fig)
-    
-    # USER LOGIN TIMELINE CHART - Shows when user logged in and scanned
     st.markdown("### 📅 Your Activity Timeline")
-    
-    # Get user's login logs
     logs = get_user_activity_logs()
     user_logs = [l for l in logs if l.get('user_email') == st.session_state.user_email]
-    
-    if user_logs:
+    if user_logs and PLOTLY_AVAILABLE:
         df_logs = pd.DataFrame(user_logs)
         df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp'])
         df_logs['date'] = df_logs['timestamp'].dt.date
         df_logs['hour'] = df_logs['timestamp'].dt.hour
-        
-        # Group by date for timeline
         timeline = df_logs.groupby('date').size().reset_index(name='count')
-        
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=timeline['date'],
@@ -1189,13 +1119,10 @@ def show_analytics_page():
             font={'color': '#1e1e3f'}
         )
         st.plotly_chart(fig, use_container_width=True)
-        
-        # Activity by hour
         st.markdown("### 🕐 Activity by Hour")
         hour_counts = df_logs['hour'].value_counts().sort_index()
         hours = list(range(24))
         counts = [hour_counts.get(h, 0) for h in hours]
-        
         fig = go.Figure(data=[go.Bar(
             x=hours,
             y=counts,
@@ -1209,6 +1136,8 @@ def show_analytics_page():
             font={'color': '#1e1e3f'}
         )
         st.plotly_chart(fig, use_container_width=True)
+    elif user_logs:
+        st.info("Install plotly to see timeline charts")
     else:
         st.info("No activity data yet. Login and scan jobs to see timeline.")
 
@@ -1220,15 +1149,10 @@ def show_profile_page():
         <p style="color:#6b21a5;">Premium Security System</p>
     </div>
     """, unsafe_allow_html=True)
-    
     users = load_users()
     user_data = users.get(st.session_state.user_email, {})
-    
-    # Get user's personal scan history
     user_scans = [h for h in st.session_state.history if h.get('user_email') == st.session_state.user_email]
-    
     col1, col2 = st.columns([1, 2])
-    
     with col1:
         st.markdown(f"""
         <div style="background:linear-gradient(135deg,#6a0dad,#8a2be2); border-radius:20px; padding:2rem; text-align:center;">
@@ -1240,24 +1164,19 @@ def show_profile_page():
             </div>
         </div>
         """, unsafe_allow_html=True)
-    
     with col2:
         st.markdown("""
         <div style="background:rgba(255,255,255,0.1); backdrop-filter:blur(10px); border-radius:20px; padding:2rem;">
             <h3 style="color:#8b5cf6;">📋 Personal Information</h3>
         """, unsafe_allow_html=True)
-        
         registered = user_data.get('registered_at', datetime.now().isoformat())[:10]
         last_login = user_data.get('last_login', 'Never')[:10] if user_data.get('last_login') else 'Never'
-        
         st.markdown(f"""
         <p style="color:#1e1e3f;"><strong>Username:</strong> {user_data.get('name', '')}</p>
         <p style="color:#1e1e3f;"><strong>Email:</strong> {user_data.get('email', '')}</p>
         <p style="color:#1e1e3f;"><strong>Member Since:</strong> {registered}</p>
         <p style="color:#1e1e3f;"><strong>Last Login:</strong> {last_login}</p>
-        
         <h3 style="color:#8b5cf6; margin-top:2rem;">📊 Activity Stats</h3>
-        
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-top:1rem;">
             <div style="background:rgba(139,92,246,0.1); border-radius:10px; padding:1rem; text-align:center;">
                 <h2 style="color:#8b5cf6; margin:0;">{len(user_scans)}</h2>
@@ -1272,26 +1191,21 @@ def show_profile_page():
                 <p style="color:#1e1e3f; margin:0;">Total All Time</p>
             </div>
         </div>
-        
         <h3 style="color:#8b5cf6; margin-top:2rem;">⚙️ Account Settings</h3>
         """, unsafe_allow_html=True)
-        
         if st.button("🔑 Change Password", use_container_width=True):
             st.info("Password change feature coming soon!")
-        
         st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Show user's recent scans
     if user_scans:
         st.markdown("### 📜 My Recent Scans")
-        recent = user_scans[-5:]  # Last 5 scans
+        recent = user_scans[-5:]
         df = pd.DataFrame(recent)
         display_df = df[['timestamp', 'job_text', 'result', 'score', 'language']].copy()
         display_df['score'] = display_df['score'].apply(lambda x: f"{x:.1f}%")
         display_df.columns = ['Time', 'Job Preview', 'Result', 'Score', 'Language']
         st.dataframe(display_df, use_container_width=True)
 
-# ==================== ADMIN PANEL (EXACTLY LIKE SCREENSHOTS) ====================
+# ==================== ADMIN PANEL ====================
 def show_admin_panel():
     st.markdown("""
     <div style="background: linear-gradient(135deg, #2a1b3d, #1a1a2e); padding:1.5rem; border-radius:20px; margin-bottom:2rem;">
@@ -1299,118 +1213,164 @@ def show_admin_panel():
         <p style="color:#b5a5d5; margin:0;">JobShield AI - Premium Security System</p>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Create two columns for the two main sections
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        <div style="background: #2d1b45; padding:1.5rem; border-radius:20px; margin-bottom:1rem;">
-            <h3 style="color:#c084fc; margin:0;">👥 User Management</h3>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Load users
+    if not st.session_state.is_admin:
+        st.error("⛔ Access Denied! Admin only.")
+        return
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "👥 Users", "📋 Activity", "🤖 Model"])
+    with tab1:
         users = load_users()
-        
-        # Create user table data
+        logs = get_user_activity_logs()
+        total_users = len(users)
+        total_scans = len(st.session_state.history)
+        fake_scans = sum(1 for h in st.session_state.history if h['result'] == 'FAKE')
+        total_logins = len([l for l in logs if l['action'] == 'login']) if logs else 0
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,#6a0dad,#8a2be2); border-radius:15px; padding:1.5rem; text-align:center;">
+                <h3 style="color:white; margin:0;">👥 Users</h3>
+                <h2 style="color:white; margin:0;">{total_users}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,#6a0dad,#8a2be2); border-radius:15px; padding:1.5rem; text-align:center;">
+                <h3 style="color:white; margin:0;">📊 Scans</h3>
+                <h2 style="color:white; margin:0;">{total_scans}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        with col3:
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,#ff416c,#ff4b2b); border-radius:15px; padding:1.5rem; text-align:center;">
+                <h3 style="color:white; margin:0;">⚠️ Threats</h3>
+                <h2 style="color:white; margin:0;">{fake_scans}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        with col4:
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,#11998e,#38ef7d); border-radius:15px; padding:1.5rem; text-align:center;">
+                <h3 style="color:white; margin:0;">🔐 Logins</h3>
+                <h2 style="color:white; margin:0;">{total_logins}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("### 📈 User Activity Timeline")
+        if logs and PLOTLY_AVAILABLE:
+            df_logs = pd.DataFrame(logs)
+            df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp'])
+            df_logs['date'] = df_logs['timestamp'].dt.date
+            timeline = df_logs.groupby('date').size().reset_index(name='count')
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=timeline['date'],
+                y=timeline['count'],
+                mode='lines+markers',
+                line=dict(color='#8b5cf6', width=3),
+                marker=dict(size=8, color='#ff416c')
+            ))
+            fig.update_layout(
+                title="All Users Activity Over Time",
+                xaxis_title="Date",
+                yaxis_title="Number of Actions",
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font={'color': '#1e1e3f'}
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        elif logs:
+            st.info("Install plotly to see timeline charts")
+        else:
+            st.info("No activity data yet")
+    with tab2:
+        st.markdown("### 👥 User Management")
+        users = load_users()
         user_data = []
-        for idx, (email, data) in enumerate(users.items()):
+        for email, data in users.items():
             user_data.append({
-                "id": idx,
-                "username": data['name'],
-                "email": email,
-                "password": data['password'][:15] + "..."  # Show partial hash
+                "Username": data['name'],
+                "Email": email,
+                "Registered": data.get('registered_at', 'Unknown')[:10],
+                "Last Login": data.get('last_login', 'Never')[:10] if data.get('last_login') else 'Never',
+                "Scans": data.get('total_scans', 0),
+                "Role": "👑 Admin" if data.get('is_admin') else "👤 User"
             })
-        
         if user_data:
-            df_users = pd.DataFrame(user_data)
-            st.dataframe(
-                df_users[['id', 'username', 'email', 'password']],
-                use_container_width=True,
-                hide_index=True
-            )
+            df = pd.DataFrame(user_data)
+            st.dataframe(df, use_container_width=True)
+        st.markdown("#### 🗑️ Delete User")
+        non_admin_emails = [email for email, data in users.items() if not data.get('is_admin', False)]
+        if non_admin_emails:
+            selected_email = st.selectbox("Select user to delete", non_admin_emails)
+            if st.button("🗑️ Delete User", type="primary", use_container_width=True):
+                del users[selected_email]
+                save_users(users)
+                log_user_activity(st.session_state.user_email, st.session_state.user_name, "deleted_user", f"Deleted user: {selected_email}")
+                st.success(f"User {selected_email} deleted successfully!")
+                st.rerun()
         else:
-            st.info("No users yet")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # User action section (like screenshot)
-        st.markdown("""
-        <div style="background: #2d1b45; padding:1.5rem; border-radius:20px;">
-            <h4 style="color:#c084fc;">User Actions</h4>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if user_data:
-            emails = [u['email'] for u in user_data if u['email'] != ADMIN_EMAIL]  # Exclude admin
-            if emails:
-                selected_email = st.selectbox("User Email to Manage", emails, key="admin_user_select")
-                action = st.selectbox("Action", ["Disable User", "Enable User", "Delete User"], key="admin_action")
-                
-                if st.button("Execute", use_container_width=True):
-                    if action == "Delete User":
-                        # Remove user
-                        del users[selected_email]
-                        save_users(users)
-                        st.success(f"✅ User {selected_email} deleted successfully!")
-                        st.rerun()
-                    else:
-                        st.info(f"ℹ️ {action} feature coming soon")
-            else:
-                st.info("No non-admin users to manage")
-    
-    with col2:
-        st.markdown("""
-        <div style="background: #2d1b45; padding:1.5rem; border-radius:20px; margin-bottom:1rem;">
-            <h3 style="color:#c084fc; margin:0;">📋 Scan History</h3>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Load scan history with user info
-        if st.session_state.history:
-            # Create scan history table
-            scan_data = []
-            for idx, scan in enumerate(st.session_state.history):
-                scan_data.append({
-                    "id": idx,
-                    "user_id": scan.get('user_email', 'unknown'),
-                    "qr_data": scan.get('job_text', '')[:50] + "..." if len(scan.get('job_text', '')) > 50 else scan.get('job_text', '')
-                })
-            
-            df_scans = pd.DataFrame(scan_data)
-            st.dataframe(
-                df_scans[['id', 'user_id', 'qr_data']],
-                use_container_width=True,
-                hide_index=True
-            )
+            st.info("No non-admin users to delete.")
+    with tab3:
+        st.markdown("### 📋 User Activity Log")
+        logs = get_user_activity_logs()
+        if logs:
+            df_logs = pd.DataFrame(logs)
+            col1, col2 = st.columns(2)
+            with col1:
+                users_list = ['All'] + list(df_logs['user_name'].unique())
+                selected_user = st.selectbox("Filter by User", users_list, key="filter_user")
+            with col2:
+                actions_list = ['All'] + list(df_logs['action'].unique())
+                selected_action = st.selectbox("Filter by Action", actions_list, key="filter_action")
+            filtered = df_logs.copy()
+            if selected_user != 'All':
+                filtered = filtered[filtered['user_name'] == selected_user]
+            if selected_action != 'All':
+                filtered = filtered[filtered['action'] == selected_action]
+            display_df = filtered[['timestamp', 'user_name', 'user_email', 'action', 'details']]
+            display_df.columns = ['Time', 'User', 'Email', 'Action', 'Details']
+            st.dataframe(display_df, use_container_width=True)
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Logins", len(df_logs[df_logs['action'] == 'login']))
+            with col2:
+                st.metric("Total Scans", len(df_logs[df_logs['action'] == 'scanned a job']))
+            with col3:
+                st.metric("Registrations", len(df_logs[df_logs['action'] == 'registered']))
+            with col4:
+                st.metric("User Deletions", len(df_logs[df_logs['action'] == 'deleted_user']))
         else:
-            st.info("No scan history yet")
-    
-    st.markdown("---")
-    
-    # Logout button at bottom
-    if st.button("🚪 Logout from Admin Panel", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.is_admin = False
-        st.rerun()
+            st.info("No activity logs yet")
+    with tab4:
+        st.markdown("### 🤖 Model Management")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Current Model Accuracy", f"{model_accuracy*100:.2f}%" if model_accuracy else "Unknown")
+            st.metric("Dataset Size", "Using: fake_job.csv")
+        with col2:
+            st.metric("Total Features", "5000 (TF-IDF)")
+            st.metric("Model Type", "Logistic Regression")
+        if st.button("🔄 Retrain Model", use_container_width=True):
+            with st.spinner("Retraining model... This may take a moment."):
+                new_model, new_vectorizer, new_accuracy = retrain_model()
+                if new_model is not None:
+                    model = new_model
+                    vectorizer = new_vectorizer
+                    model_accuracy = new_accuracy
+                    st.success(f"✅ Model retrained successfully! New accuracy: {new_accuracy*100:.2f}%")
+                    log_user_activity(st.session_state.user_email, st.session_state.user_name, "retrained_model", f"New accuracy: {new_accuracy*100:.2f}%")
+                    st.rerun()
+                else:
+                    st.error("❌ Model retraining failed. Check dataset path.")
 
-# ==================== HISTORY PAGE (with Export) ====================
+# ==================== HISTORY PAGE ====================
 def show_history_page():
     st.markdown("## 📜 Scan History")
-    
-    # Show ALL history (never delete old scans)
     if not st.session_state.history:
         st.info("No scans yet. Go to Scanner and analyze some jobs!")
         return
-    
     df = pd.DataFrame(st.session_state.history)
-    
-    # Summary stats
     total = len(df)
     fake = len(df[df['result'] == 'FAKE'])
     real = total - fake
-    
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f"""
@@ -1433,16 +1393,11 @@ def show_history_page():
             <h2 style="color:white; margin:0;">{real}</h2>
         </div>
         """, unsafe_allow_html=True)
-    
-    # Display history table
     st.markdown("### 📋 All Scans")
     display_df = df[['timestamp', 'user_name', 'job_text', 'result', 'score', 'language']].copy()
     display_df['score'] = display_df['score'].apply(lambda x: f"{x:.1f}%")
     display_df.columns = ['Time', 'User', 'Job Preview', 'Result', 'Score', 'Language']
-    
     st.dataframe(display_df, use_container_width=True)
-    
-    # Export options
     st.markdown("### 📥 Export History")
     col1, col2 = st.columns(2)
     with col1:
@@ -1469,16 +1424,13 @@ def show_scanner_page():
         <p class="hero-sub-premium">Paste any job posting or upload screenshot - we'll analyze it in 20+ languages</p>
     </div>
     """, unsafe_allow_html=True)
-    
     input_method = st.radio(
         "Choose input method:",
         ["📝 Paste Text", "🔗 Job URL", "📸 Image Upload"],
         horizontal=True
     )
-    
     job_text = ""
     job_url = None
-    
     if input_method == "📝 Paste Text":
         st.markdown("#### 📝 Paste Job Description")
         job_text = st.text_area(
@@ -1537,30 +1489,29 @@ def show_scanner_page():
             else:
                 st.warning(f"⚠️ {domain} is not a known trusted portal!")
                 job_text = f"suspicious unknown domain {domain} unverified link job posting fee deposit urgent"
-    else:  # Image Upload
-            st.markdown("#### 📸 Upload Job Screenshot")
-            uploaded_file = st.file_uploader(
-                "Choose an image...",
-                type=['png', 'jpg', 'jpeg', 'bmp'],
-                help="Upload screenshot of job posting"
-            )
-            if uploaded_file is not None:
-                st.image(uploaded_file, caption="Uploaded Screenshot", width=300)
-                
-                with st.spinner("🔍 Extracting text from image..."):
-                    extracted_text, error = extract_text_from_image(uploaded_file)
-                    if extracted_text:
-                        st.success("✅ Text extracted successfully!")
-                        job_text = extracted_text
-                    else:
-                        st.error(f"❌ {error}")
-                        job_text = ""
-        
-        
+    else:
+        st.markdown("#### 📸 Upload Job Screenshot")
+        uploaded_file = st.file_uploader(
+            "Choose an image...",
+            type=['png', 'jpg', 'jpeg', 'bmp'],
+            help="Upload screenshot of job posting"
+        )
+        if uploaded_file is not None:
+            st.image(uploaded_file, caption="Uploaded Screenshot", width=300)
+            with st.spinner("🔍 Extracting text from image..."):
+                extracted_text, error = extract_text_from_image(uploaded_file)
+                if extracted_text:
+                    cleaned_text = clean_ocr_text(extracted_text)
+                    st.success("✅ Text extracted successfully!")
+                    with st.expander("📝 View Extracted Text"):
+                        st.write(cleaned_text)
+                    job_text = cleaned_text
+                else:
+                    st.error(f"❌ {error}")
+                    job_text = ""
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         analyze_clicked = st.button("🔍 ANALYZE JOB - DETECT FRAUD", use_container_width=True)
-    
     if analyze_clicked:
         if not job_text.strip():
             st.warning("⚠️ Please enter job content first!")
@@ -1569,11 +1520,9 @@ def show_scanner_page():
         else:
             with st.spinner("🔍 Analyzing with AI Engine..."):
                 analysis = analyze_job(job_text)
-            
             if not analysis:
                 st.error("❌ Analysis failed. Please try again.")
             else:
-                # Save to history with user email
                 history_entry = {
                     'timestamp': datetime.now().isoformat(),
                     'job_text': job_text[:100] + "...",
@@ -1585,20 +1534,14 @@ def show_scanner_page():
                 }
                 st.session_state.history.append(history_entry)
                 save_history()
-                
-                # Update user scan count
                 update_user_scans(st.session_state.user_email)
-                
-                # Log scan activity
                 log_user_activity(
                     st.session_state.user_email,
                     st.session_state.user_name,
                     "scanned a job",
                     f"Result: {analysis['result']} | Score: {analysis['score']:.1f}% | Language: {analysis['detected_lang']}"
                 )
-                
                 st.markdown("---")
-                
                 if analysis['result'] == "FAKE":
                     st.markdown(f"""
                     <div class="fake-banner-premium">
@@ -1617,17 +1560,13 @@ def show_scanner_page():
                     """, unsafe_allow_html=True)
                     if job_url:
                         st.markdown(f"[🔗 Apply on Company Website]({job_url})")
-                
-                # Share buttons
                 st.markdown("### 📤 Share Result")
                 if analysis['result'] == "FAKE":
                     share_text = f"🚨 FAKE JOB ALERT! Fraud Probability: {analysis['score']:.1f}%"
                 else:
                     share_text = f"✅ Job seems genuine! Safety Score: {100-analysis['score']:.1f}%"
-                
                 whatsapp_link = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
                 mailto_link = f"mailto:?subject=JobShield AI Result&body={urllib.parse.quote(share_text)}"
-                
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.markdown(f'<a href="{whatsapp_link}" target="_blank" class="share-button">📱 WhatsApp</a>', unsafe_allow_html=True)
@@ -1635,8 +1574,6 @@ def show_scanner_page():
                     st.markdown(f'<a href="#" onclick="navigator.clipboard.writeText(`{share_text}`);alert(\'Copied!\');" class="share-button">📋 Copy</a>', unsafe_allow_html=True)
                 with col3:
                     st.markdown(f'<a href="{mailto_link}" class="share-button">📧 Email</a>', unsafe_allow_html=True)
-                
-                # Auto Email
                 with st.spinner("📧 Sending analysis report to your email..."):
                     auto_sent = send_email_alert(
                         to_email=st.session_state.user_email,
@@ -1649,7 +1586,6 @@ def show_scanner_page():
                         detected_lang=analysis['detected_lang'],
                         translated_text=analysis['translated_text'],
                     )
-                
                 if auto_sent:
                     st.markdown(f"""
                     <div class="email-alert-premium">
@@ -1658,14 +1594,10 @@ def show_scanner_page():
                     """, unsafe_allow_html=True)
                 else:
                     st.warning("⚠️ Auto email failed - check SMTP settings.")
-                
                 st.markdown("<br>", unsafe_allow_html=True)
-                
                 col1, col2 = st.columns(2)
-                
                 with col1:
                     st.markdown("#### 🌍 Language Analysis")
-                    
                     lang_map = {
                         'ta':'Tamil','hi':'Hindi','en':'English','ar':'Arabic','zh-cn':'Chinese',
                         'es':'Spanish','fr':'French','de':'German','ja':'Japanese','ko':'Korean',
@@ -1673,25 +1605,20 @@ def show_scanner_page():
                         'bn':'Bengali','vi':'Vietnamese','th':'Thai','ur':'Urdu',
                     }
                     lang_display = lang_map.get(analysis['detected_lang'], analysis['detected_lang'].upper())
-                    
                     st.info(f"**Detected Language:** {lang_display}")
-                    
                     if analysis['detected_lang'] != 'en':
                         st.markdown("#### 📝 English Translation")
                         st.info(analysis['translated_text'][:400] + ("..." if len(analysis['translated_text']) > 400 else ""))
-                    
                     if analysis['trigger_hits']:
                         st.markdown("#### ⚠️ Risk Indicators")
                         for hit in analysis['trigger_hits']:
                             st.markdown(f'<span class="risk-badge-premium">{hit}</span>', unsafe_allow_html=True)
                     else:
                         st.success("✅ No major risk keywords found")
-                
                 with col2:
                     st.markdown("#### 💡 Recommendations")
                     for s in analysis['suggestions']:
                         st.markdown(f"- {s}")
-                
                 st.markdown("<br>", unsafe_allow_html=True)
                 heading = "### 🚨 Apply on These TRUSTED Platforms Instead!" if analysis['result'] == "FAKE" else "### 🏆 Top Trusted Job Platforms"
                 st.markdown(heading)
@@ -1708,7 +1635,6 @@ def show_scanner_page():
 # ==================== AUTH PAGE ====================
 def show_auth_page():
     col1, col2, col3 = st.columns([1, 2, 1])
-    
     with col2:
         st.markdown("""
         <div class="hero-premium">
@@ -1716,16 +1642,11 @@ def show_auth_page():
             <p class="hero-sub-premium">Premium Fake Job Detection System</p>
         </div>
         """, unsafe_allow_html=True)
-        
-        
-        # Tabs inside the same box
         tab1, tab2 = st.tabs(["🔐 LOGIN", "📝 REGISTER"])
-        
         with tab1:
             st.markdown("### 👋 Welcome Back!")
             email = st.text_input("📧 Email", placeholder="Enter your email", key="login_email")
             password = st.text_input("🔑 Password", type="password", placeholder="Enter password", key="login_pass")
-            
             if st.button("🚀 LOGIN NOW", use_container_width=True):
                 if email and password:
                     success, result, is_admin = login_user(email, password)
@@ -1734,30 +1655,22 @@ def show_auth_page():
                         st.session_state.user_email = email
                         st.session_state.user_name = result
                         st.session_state.is_admin = is_admin
-                        
-                        # Load history from file
                         load_history()
-                        
                         with st.spinner("📧 Sending security alert..."):
                             send_admin_alert(email, result, "login")
-                        
-                        
                         st.success(f"✅ Welcome back, {result}!")
-                        
                         time.sleep(1)
                         st.rerun()
                     else:
                         st.error(f"❌ {result}")
                 else:
                     st.warning("⚠️ Fill all fields!")
-        
         with tab2:
             st.markdown("### ✨ Create New Account")
             name = st.text_input("👤 Full Name", placeholder="Enter your name", key="reg_name")
             email = st.text_input("📧 Email", placeholder="Enter your email", key="reg_email")
             password = st.text_input("🔑 Password", type="password", placeholder="Create password", key="reg_pass")
             confirm = st.text_input("🔒 Confirm Password", type="password", placeholder="Confirm password", key="reg_confirm")
-            
             if st.button("📝 REGISTER NOW", use_container_width=True):
                 if name and email and password and confirm:
                     if password != confirm:
@@ -1765,16 +1678,12 @@ def show_auth_page():
                     else:
                         success, msg = register_user(name, email, password)
                         if success:
-                            
                             st.success(f"✅ {msg} Please login!")
                         else:
                             st.error(f"❌ {msg}")
                 else:
                     st.warning("⚠️ Fill all fields!")
-        
         st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Stats below the box
         col_a, col_b, col_c = st.columns(3)
         with col_a:
             st.markdown("""
@@ -1800,15 +1709,12 @@ def show_auth_page():
 
 # ==================== MAIN PAGE ====================
 def show_main_page():
-    # Admin Alert Badge
     if st.session_state.is_admin:
         st.markdown("""
         <div class="admin-badge">
             👑 ADMIN MODE
         </div>
         """, unsafe_allow_html=True)
-    
-    # Premium Sidebar
     with st.sidebar:
         st.markdown("""
         <div style="text-align:center; padding:1rem;">
@@ -1816,37 +1722,26 @@ def show_main_page():
             <h3 style="color:#8b5cf6; margin:0;">JobShield AI</h3>
         </div>
         """, unsafe_allow_html=True)
-        
         st.markdown(f"""
         <div class="sidebar-user-premium">
             <p style="color:white; margin:0;">👤 {st.session_state.user_name}</p>
             <p style="color:rgba(255,255,255,0.9); font-size:0.8rem; margin:5px 0 0;">{st.session_state.user_email}</p>
         </div>
         """, unsafe_allow_html=True)
-        
         st.markdown("---")
-        
-        # Navigation
         nav_options = ["🔍 Scanner", "📜 History", "📊 Analytics", "👤 Profile"]
         if st.session_state.is_admin:
             nav_options.append("👑 Admin Panel")
-        
-        # Set page from session or default
         if st.session_state.page not in nav_options:
             st.session_state.page = "🔍 Scanner"
-        
         for option in nav_options:
             if st.button(option, key=f"nav_{option}", use_container_width=True):
                 st.session_state.page = option
                 st.rerun()
-        
         st.markdown("---")
-        
-        # Quick Stats
         st.markdown("### 📊 Quick Stats")
         total_scans = len(st.session_state.history)
         user_scans = len([h for h in st.session_state.history if h.get('user_email') == st.session_state.user_email])
-        
         col1, col2 = st.columns(2)
         with col1:
             st.markdown(f"""
@@ -1862,17 +1757,13 @@ def show_main_page():
                 <p style="color:#4a4a6a; margin:0;">My Scans</p>
             </div>
             """, unsafe_allow_html=True)
-        
         st.markdown("---")
-        
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.is_admin = False
             st.session_state.user_email = ""
             st.session_state.user_name = ""
             st.rerun()
-    
-    # Page routing
     if st.session_state.page == "🔍 Scanner":
         show_scanner_page()
     elif st.session_state.page == "📜 History":

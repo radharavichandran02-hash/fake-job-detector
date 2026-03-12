@@ -3,9 +3,9 @@ pandas
 scikit-learn
 deep-translator
 langdetect
+pytesseract
+pillow
+matplotlib
+plotly
 openpyxl
 xlrd
-pillow
-pytesseract
-matplotlib
-requests
